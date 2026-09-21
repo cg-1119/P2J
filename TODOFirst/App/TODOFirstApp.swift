@@ -35,8 +35,14 @@ struct TODOFirstApp: App {
         }
         .defaultSize(width: 720, height: 580)
 
-        MenuBarExtra("P2J", systemImage: "checklist") {
-            MenuBarView()
+        MenuBarExtra {
+            MenuBarView().environment(taskStore)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "checklist")
+                Text("P2J")
+            }
+            .accessibilityLabel("P2J 오늘 할 일")
         }
         .menuBarExtraStyle(.window)
     }
