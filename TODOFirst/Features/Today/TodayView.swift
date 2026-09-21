@@ -1,7 +1,7 @@
 import SwiftUI
 
 private enum TaskFilter: String, CaseIterable, Identifiable {
-    case today = "오늘", recurring = "반복 일정", all = "전체"
+    case today = "오늘", recurring = "반복 일정", all = "전체", statistics = "통계"
     var id: String { rawValue }
 }
 
@@ -88,7 +88,9 @@ struct TodayView: View {
                 .background(.red.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
             }
 
-            if tasks.isEmpty {
+            if filter == .statistics {
+                StatisticsView(records: store.records, date: date)
+            } else if tasks.isEmpty {
                 ContentUnavailableView {
                     Label(emptyTitle, systemImage: filter == .recurring ? "repeat" : "checklist")
                 } description: {
@@ -130,6 +132,7 @@ struct TodayView: View {
             case .today: item.occurs(on: date)
             case .recurring: item.repeatRule != .once
             case .all: true
+            case .statistics: false
             }
         }
         .sorted { $0.createdAt < $1.createdAt }
@@ -140,6 +143,7 @@ struct TodayView: View {
         case .today: "오늘 할 일을 등록해보세요"
         case .recurring: "꾸준히 하고 싶은 일이 있나요?"
         case .all: "아직 등록한 할 일이 없어요"
+        case .statistics: "통계"
         }
     }
 
@@ -148,6 +152,7 @@ struct TodayView: View {
         case .today: "오늘 하루만 할 일도, 매일의 작은 습관도 좋아요."
         case .recurring: "매일·평일·매주 반복할 일을 한 번만 등록하세요."
         case .all: "할 일 추가 버튼이나 ⌘N으로 시작하세요."
+        case .statistics: "오늘의 기록을 확인하세요."
         }
     }
 }

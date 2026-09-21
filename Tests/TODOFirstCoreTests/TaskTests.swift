@@ -171,4 +171,35 @@ final class TaskTests: XCTestCase {
         XCTAssertFalse(store.items[0].isCompleted(on: date(21), calendar: calendar))
     }
 
+    func testStatisticsCountScheduledOccurrencesAndCompletion() {
+        var daily = item(.daily)
+        daily.completedDays = [TaskDay(date(21), calendar: calendar), TaskDay(date(22), calendar: calendar)]
+        var once = item(.once)
+        once.completedDays = [TaskDay(date(21), calendar: calendar)]
+        let history = TaskStatistics.recent(7, through: date(27), records: [daily, once, item(.weekdays), item(.weekly)], calendar: calendar)
+        XCTAssertEqual(history.count, 7)
+        XCTAssertEqual(history.first?.date, calendar.startOfDay(for: date(21)))
+        XCTAssertEqual(history.reduce(0) { $0 + $1.total }, 14)
+        XCTAssertEqual(history.reduce(0) { $0 + $1.completed }, 3)
+        XCTAssertEqual(history.last?.total, 1)
+        XCTAssertEqual(history.first?.rate, 0.5)
+    }
+
+    func testArchivePreservesPastStatisticsButStopsFutureSchedule() {
+        var task = item(.daily)
+        task.completedDays = [TaskDay(date(21), calendar: calendar), TaskDay(date(22), calendar: calendar)]
+        task.archivedOn = TaskDay(date(22), calendar: calendar)
+        XCTAssertEqual(TaskStatistics.day(date(21), records: [task], calendar: calendar).completed, 1)
+        XCTAssertEqual(TaskStatistics.day(date(22), records: [task], calendar: calendar).completed, 1)
+        XCTAssertEqual(TaskStatistics.day(date(23), records: [task], calendar: calendar).total, 0)
+    }
+
+    func testEmptyStatisticsAndThirtyDayRange() {
+        let history = TaskStatistics.recent(30, through: date(21), records: [], calendar: calendar)
+        XCTAssertEqual(history.count, 30)
+        XCTAssertTrue(history.allSatisfy { $0.total == 0 && $0.rate == 0 })
+        XCTAssertEqual(history.last?.date, calendar.startOfDay(for: date(21)))
+        XCTAssertTrue(TaskStatistics.recent(0, through: date(21), records: []).isEmpty)
+    }
+
 }
