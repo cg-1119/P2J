@@ -70,11 +70,8 @@ struct WidgetDayModel {
         let today = records.filter { $0.archivedOn == nil && $0.occurs(on: date, calendar: calendar) }
         total = today.count
         completed = today.filter { $0.isCompleted(on: date, calendar: calendar) }.count
-        remainingItems = today.filter { !$0.isCompleted(on: date, calendar: calendar) }
-            .sorted {
-                if $0.createdAt == $1.createdAt { return $0.id.uuidString < $1.id.uuidString }
-                return $0.createdAt < $1.createdAt
-            }
+        remainingItems = TodoItem.ordered(today.filter { !$0.isCompleted(on: date, calendar: calendar) },
+                                          on: date, calendar: calendar)
     }
 
     /// 갱신이 늦어져도 자정에 다음 날 일정으로 바뀌도록 미래 엔트리를 준비합니다.

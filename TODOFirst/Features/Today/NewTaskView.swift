@@ -7,6 +7,7 @@ struct NewTaskView: View {
     @State private var title = ""
     @State private var note = ""
     @State private var repeatRule: TaskRepeat = .once
+    @State private var priority: TaskPriority = .normal
     @State private var date = Date.now
 
     private var valid: Bool {
@@ -35,6 +36,15 @@ struct NewTaskView: View {
                         Text("제목은 120자, 메모는 2,000자까지 입력해주세요.")
                             .font(.caption).foregroundStyle(.red)
                     }
+                }
+                Section("무엇부터 할까요?") {
+                    Picker("우선순위", selection: $priority) {
+                        ForEach(TaskPriority.allCases) { priority in
+                            Text(priority.title).tag(priority)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("taskPriority")
                 }
                 Section("언제 할까요?") {
                     Picker("반복", selection: $repeatRule) {
@@ -72,7 +82,7 @@ struct NewTaskView: View {
                 Button("취소") { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button("등록") {
-                    let item = TodoItem(title: title, note: note, repeatRule: repeatRule, startDate: date)
+                    let item = TodoItem(title: title, note: note, repeatRule: repeatRule, startDate: date, priority: priority)
                     if store.add(item) { dismiss() }
                 }
                 .buttonStyle(.borderedProminent)
@@ -82,7 +92,7 @@ struct NewTaskView: View {
             }
             .padding(20)
         }
-        .frame(width: 520, height: 470)
+        .frame(width: 520, height: 550)
         .onAppear { titleFocused = true }
     }
 }

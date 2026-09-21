@@ -53,28 +53,42 @@ enum TaskRepeat: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+enum TaskPriority: Int, Codable, CaseIterable, Identifiable, Sendable {
+    case high = 0, normal = 1, low = 2
+    var id: Int { rawValue }
+    var title: String {
+        switch self {
+        case .high: "높음"
+        case .normal: "보통"
+        case .low: "낮음"
+        }
+    }
+}
+
 struct TodoItem: Codable, Identifiable, Equatable, Sendable {
     let id: UUID
     var title: String
     var note: String
     var repeatRule: TaskRepeat
+    var priority: TaskPriority
     var startDay: TaskDay
     let createdAt: Date
     var completedDays: Set<TaskDay> = []
     var archivedOn: TaskDay?
 
     init(id: UUID = UUID(), title: String, note: String = "", repeatRule: TaskRepeat = .once,
-         startDate: Date = .now, createdAt: Date = .now, calendar: Calendar = .current) {
+         startDate: Date = .now, createdAt: Date = .now, priority: TaskPriority = .normal, calendar: Calendar = .current) {
         self.id = id
         self.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         self.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
         self.repeatRule = repeatRule
+        self.priority = priority
         self.startDay = TaskDay(startDate, calendar: calendar)
         self.createdAt = createdAt
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, note, repeatRule, startDay, createdAt, completedDays, archivedOn
+        case id, title, note, repeatRule, startDay, createdAt, completedDays, archivedOn, priority
     }
 
     // v1 파일에 없던 완료 기록은 빈 목록으로 읽습니다.
@@ -84,10 +98,23 @@ struct TodoItem: Codable, Identifiable, Equatable, Sendable {
         title = try values.decode(String.self, forKey: .title)
         note = try values.decode(String.self, forKey: .note)
         repeatRule = try values.decode(TaskRepeat.self, forKey: .repeatRule)
+        priority = try values.decodeIfPresent(TaskPriority.self, forKey: .priority) ?? .normal
         startDay = try values.decode(TaskDay.self, forKey: .startDay)
         createdAt = try values.decode(Date.self, forKey: .createdAt)
         completedDays = try values.decodeIfPresent(Set<TaskDay>.self, forKey: .completedDays) ?? []
         archivedOn = try values.decodeIfPresent(TaskDay.self, forKey: .archivedOn)
+    }
+
+    /// 미완료 → 높은 우선순위 → 등록 순서로 정렬합니다.
+    static func ordered(_ items: [TodoItem], on date: Date, calendar: Calendar = .current) -> [TodoItem] {
+        items.sorted { lhs, rhs in
+            let leftDone = lhs.isCompleted(on: date, calendar: calendar)
+            let rightDone = rhs.isCompleted(on: date, calendar: calendar)
+            if leftDone != rightDone { return !leftDone }
+            if lhs.priority != rhs.priority { return lhs.priority.rawValue < rhs.priority.rawValue }
+            if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
     }
 
     func isCompleted(on date: Date, calendar: Calendar = .current) -> Bool {

@@ -15,6 +15,7 @@
 		494C30BEBCD49E8FE90894E4 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0C907BD3069C76082245B99D /* Cocoa.framework */; };
 		5ED8A50BCE2E51BD1CE90C47 /* TaskStatistics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F98BBFCD4031492C772934 /* TaskStatistics.swift */; };
 		64CD6996E7EB62117C7B7786 /* TODOFirstApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D744F0975378CCE166BC8C82 /* TODOFirstApp.swift */; };
+		64DB9B415A35689311A0DC9A /* TaskPriorityPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C4544642289D0232DFE0CB1 /* TaskPriorityPicker.swift */; };
 		7096182C2CDA21E7F02AAA43 /* WidgetCardContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B00EFB404294A356D8467B8 /* WidgetCardContent.swift */; };
 		8E8E41054AC752D7DABFEC45 /* WidgetGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A298773B6D7F152755523C67 /* WidgetGalleryView.swift */; };
 		AD49885047FFD74A7C9E3451 /* TodoItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A78EB577F0F5B6F89CAFE55 /* TodoItem.swift */; };
@@ -64,6 +65,7 @@
 		2B00EFB404294A356D8467B8 /* WidgetCardContent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetCardContent.swift; sourceTree = "<group>"; };
 		3A78EB577F0F5B6F89CAFE55 /* TodoItem.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TodoItem.swift; sourceTree = "<group>"; };
 		426215027B59C72590DD02A2 /* P2J.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = P2J.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7C4544642289D0232DFE0CB1 /* TaskPriorityPicker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskPriorityPicker.swift; sourceTree = "<group>"; };
 		95556B72EBAF6486FACF57BE /* NewTaskView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewTaskView.swift; sourceTree = "<group>"; };
 		A298773B6D7F152755523C67 /* WidgetGalleryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetGalleryView.swift; sourceTree = "<group>"; };
 		A6F98BBFCD4031492C772934 /* TaskStatistics.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskStatistics.swift; sourceTree = "<group>"; };
@@ -171,6 +173,7 @@
 			children = (
 				25CE3F2AE8DDEA20177A7DD6 /* TodayView.swift */,
 				95556B72EBAF6486FACF57BE /* NewTaskView.swift */,
+				7C4544642289D0232DFE0CB1 /* TaskPriorityPicker.swift */,
 			);
 			name = Today;
 			path = Today;
@@ -371,6 +374,7 @@
 				CB1566CBF75D2ED665BA91D9 /* WidgetCardContent.swift in Sources */,
 				C56CF4A6C9952337517A67AF /* WidgetSync.swift in Sources */,
 				8E8E41054AC752D7DABFEC45 /* WidgetGalleryView.swift in Sources */,
+				64DB9B415A35689311A0DC9A /* TaskPriorityPicker.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

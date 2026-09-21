@@ -62,6 +62,14 @@ final class TaskStore {
         return persist(next)
     }
 
+    @discardableResult
+    func setPriority(_ priority: TaskPriority, for item: TodoItem) -> Bool {
+        guard let index = records.firstIndex(where: { $0.id == item.id && $0.archivedOn == nil }) else { return false }
+        var next = records
+        next[index].priority = priority
+        return persist(next)
+    }
+
     private func persist(_ next: [TodoItem]) -> Bool {
         guard isReady, let repository else { return false }
         do {

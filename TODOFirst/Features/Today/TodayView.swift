@@ -107,6 +107,7 @@ struct TodayView: View {
                         ForEach(tasks) { item in
                             TaskRow(item: item, date: date,
                                     onToggle: { store.toggleCompletion(item) },
+                                    onPriority: { store.setPriority($0, for: item) },
                                     onDelete: { pendingDeletion = item })
                                 .disabled(!store.isReady)
                         }
@@ -130,7 +131,7 @@ struct TodayView: View {
     }
 
     private func filtered(on date: Date) -> [TodoItem] {
-        store.items.filter { item in
+        let items = store.items.filter { item in
             switch filter {
             case .today: item.occurs(on: date)
             case .recurring: item.repeatRule != .once
@@ -138,7 +139,7 @@ struct TodayView: View {
             case .statistics: false
             }
         }
-        .sorted { $0.createdAt < $1.createdAt }
+        return TodoItem.ordered(items, on: date)
     }
 
     private var emptyTitle: String {
@@ -164,6 +165,7 @@ private struct TaskRow: View {
     let item: TodoItem
     let date: Date
     let onToggle: () -> Void
+    let onPriority: (TaskPriority) -> Void
     let onDelete: () -> Void
 
     var body: some View {
@@ -195,6 +197,7 @@ private struct TaskRow: View {
                 .font(.caption).foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
+            TaskPriorityPicker(title: item.title, priority: Binding(get: { item.priority }, set: onPriority))
             Button(action: onDelete) { Image(systemName: "trash") }
                 .buttonStyle(.borderless)
                 .foregroundStyle(.secondary)

@@ -202,4 +202,57 @@ final class TaskTests: XCTestCase {
         XCTAssertTrue(TaskStatistics.recent(0, through: date(21), records: []).isEmpty)
     }
 
+    func testLegacyDataDefaultsToNormalPriority() throws {
+        var data = try JSONSerialization.jsonObject(with: JSONEncoder().encode(item(.daily))) as! [String: Any]
+        data.removeValue(forKey: "priority")
+        let restored = try JSONDecoder().decode(TodoItem.self, from: JSONSerialization.data(withJSONObject: data))
+        XCTAssertEqual(restored.priority, .normal)
+    }
+
+    func testOrderingPutsIncompleteBeforeCompletedThenUsesPriority() {
+        var high = item(.daily); high.title = "high"; high.priority = .high
+        var low = item(.daily); low.title = "low"; low.priority = .low
+        var done = item(.daily); done.title = "done"; done.priority = .high
+        done.completedDays = [TaskDay(date(21), calendar: calendar)]
+        let normal = item(.daily)
+        let sorted = TodoItem.ordered([low, done, normal, high], on: date(21), calendar: calendar)
+        XCTAssertEqual(sorted.map(\.id), [high.id, normal.id, low.id, done.id])
+    }
+
+    @MainActor func testPriorityPersistsAndPublishesWithoutLosingCompletion() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        var published: [TodoItem] = []
+        let store = TaskStore(repository: repo, didChange: { published = $0 })
+        let task = item(.daily)
+        XCTAssertTrue(store.add(task))
+        XCTAssertTrue(store.toggleCompletion(task, on: date(21), calendar: calendar))
+        XCTAssertTrue(store.setPriority(.high, for: task))
+        XCTAssertEqual(published[0].priority, .high)
+        let restored = TaskStore(repository: repo)
+        XCTAssertEqual(restored.items[0].priority, .high)
+        XCTAssertTrue(restored.items[0].isCompleted(on: date(21), calendar: calendar))
+        XCTAssertTrue(restored.remove(task))
+        XCTAssertFalse(restored.setPriority(.low, for: task))
+    }
+
+    @MainActor func testFailedPrioritySaveKeepsExistingValue() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let store = TaskStore(repository: repo)
+        let task = item(.daily)
+        XCTAssertTrue(store.add(task))
+        try FileManager.default.removeItem(at: repo.fileURL)
+        try FileManager.default.createDirectory(at: repo.fileURL, withIntermediateDirectories: true)
+        XCTAssertFalse(store.setPriority(.high, for: task))
+        XCTAssertEqual(store.items[0].priority, .normal)
+    }
+
+    func testWidgetUsesSamePriorityOrder() {
+        var low = item(.daily); low.priority = .low
+        var high = item(.daily); high.priority = .high
+        let model = WidgetDayModel(date: date(21), records: [low, high], calendar: calendar)
+        XCTAssertEqual(model.remainingItems.map(\.id), [high.id, low.id])
+    }
+
 }

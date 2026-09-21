@@ -67,7 +67,9 @@ struct WidgetCardContent: View {
             } else {
                 ForEach(model.remainingItems.prefix(limit)) { item in
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Image(systemName: "circle").font(.system(size: 8)).foregroundStyle(.teal)
+                        Image(systemName: item.priority == .high ? "flag.fill" : "circle")
+                            .font(.system(size: 8))
+                            .foregroundStyle(item.priority == .high ? Color.orange : Color.teal)
                         Text(item.title).font(.caption).lineLimit(1)
                     }
                     .privacySensitive()
