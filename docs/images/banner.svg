@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="340" viewBox="0 0 1200 340" role="img" aria-labelledby="title desc">
+  <title id="title">TODO First</title>
+  <desc id="desc">오늘 할 일, 중요한 것부터. macOS를 위한 할 일과 우선순위 앱.</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#131B2B"/><stop offset="1" stop-color="#243349"/></linearGradient>
+  </defs>
+  <rect width="1200" height="340" rx="24" fill="url(#bg)"/>
+  <circle cx="1125" cy="15" r="230" fill="#F5AB65" opacity=".05"/>
+  <circle cx="1160" cy="10" r="155" fill="none" stroke="#F5AB65" stroke-opacity=".12"/>
+  <g transform="translate(76 72)">
+    <rect width="54" height="54" rx="16" fill="#F5AB65"/>
+    <path d="m15 27 9 9 17-19" fill="none" stroke="#172132" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="148" y="108" fill="#CBD5E1" font-size="15" font-weight="600" letter-spacing="3">MAKE TODAY COUNT</text>
+    <text x="76" y="199" fill="#FFFFFF" font-size="64" font-weight="750" letter-spacing="-2">TODO <tspan fill="#F5AB65">First</tspan></text>
+    <text x="79" y="248" fill="#CCD4DF" font-size="25">오늘 할 일, 중요한 것부터.</text>
+    <text x="79" y="299" fill="#91A1B6" font-size="13" letter-spacing="2">BUILT FOR macOS  /  EARLY DEVELOPMENT</text>
+  </g>
+  <g transform="translate(870 124)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="0" y="0" width="32" height="32" rx="10" stroke="#F5AB65" stroke-width="2"/>
+    <path d="m8 16 6 6 11-13" stroke="#F5AB65" stroke-width="3"/>
+    <path d="M53 16h122" stroke="#DDE5EF" stroke-width="7"/>
+    <circle cx="16" cy="76" r="15" stroke="#65758D" stroke-width="2"/>
+    <path d="M53 76h94" stroke="#65758D" stroke-width="7"/>
+    <circle cx="16" cy="136" r="15" stroke="#465871" stroke-width="2"/>
+    <path d="M53 136h112" stroke="#465871" stroke-width="7"/>
+  </g>
+</svg>
