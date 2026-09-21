@@ -17,7 +17,7 @@
 - 공유에 실패해도 원본의 저장 성공을 취소하지 않습니다. 미리보기 창에서 연결 안내와 다시 보내기 버튼을 제공합니다.
 - 별도 원본 이전이 없어 기존 데이터 마이그레이션은 필요하지 않습니다.
 
-위젯은 현재 시점과 이후 7일의 자정 엔트리를 준비합니다. 매일 반복 일정의 완료 상태는 다음 날 다시 계산합니다. 15분 뒤 새 타임라인을 요청하지만 실제 갱신 간격은 macOS가 결정하므로 정확한 주기를 보장하지 않습니다. [Apple의 위젯 갱신 설명](https://developer.apple.com/documentation/widgetkit/keeping-a-widget-up-to-date/)
+위젯은 현재 시점과 이후 7일의 오전 6시 엔트리를 준비합니다. 매일 반복 일정의 완료 상태는 다음 날 다시 계산합니다. 15분 뒤 새 타임라인을 요청하지만 실제 갱신 간격은 macOS가 결정하므로 정확한 주기를 보장하지 않습니다. [Apple의 위젯 갱신 설명](https://developer.apple.com/documentation/widgetkit/keeping-a-widget-up-to-date/)
 
 ## 개발 서명 설정
 

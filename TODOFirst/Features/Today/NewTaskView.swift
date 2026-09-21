@@ -8,7 +8,7 @@ struct NewTaskView: View {
     @State private var note = ""
     @State private var repeatRule: TaskRepeat = .once
     @State private var priority: TaskPriority = .normal
-    @State private var date = Date.now
+    @State private var date = TaskClock.dayDate()
 
     private let editingItem: TodoItem?
 
@@ -18,7 +18,7 @@ struct NewTaskView: View {
         _note = State(initialValue: item?.note ?? "")
         _repeatRule = State(initialValue: item?.repeatRule ?? .once)
         _priority = State(initialValue: item?.priority ?? .normal)
-        _date = State(initialValue: item?.startDay.date() ?? .now)
+        _date = State(initialValue: item?.startDay.date() ?? TaskClock.dayDate())
     }
 
     private var valid: Bool {
@@ -72,7 +72,7 @@ struct NewTaskView: View {
                         Text(repeatRule.explanation)
                             .font(.caption).foregroundStyle(.secondary)
                         Spacer()
-                        Button("오늘", action: { date = .now })
+                        Button("오늘", action: { date = TaskClock.dayDate() })
                             .controlSize(.small)
                     }
                 }

@@ -7,7 +7,7 @@ struct MenuBarView: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
-            content(on: context.date)
+            content(on: TaskClock.dayDate(for: context.date))
         }
         .padding(18)
         .frame(width: 360)

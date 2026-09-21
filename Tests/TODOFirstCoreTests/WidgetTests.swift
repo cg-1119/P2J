@@ -54,14 +54,14 @@ final class WidgetTests: XCTestCase {
         XCTAssertTrue(full.remainingItems.isEmpty)
     }
 
-    func testTimelineCrossesDSTAtLocalMidnight() {
+    func testTimelineCrossesDSTAtLocalSixAM() {
         var c = Calendar(identifier: .gregorian)
         c.timeZone = TimeZone(identifier: "America/Los_Angeles")!
-        let start = c.date(from: DateComponents(year: 2026, month: 3, day: 7, hour: 12))!
+        let start = c.date(from: DateComponents(year: 2026, month: 3, day: 6, hour: 12))!
         let dates = WidgetDayModel.timelineDates(from: start, calendar: c)
         XCTAssertEqual(dates.count, 8)
         XCTAssertEqual(dates[0], start)
-        XCTAssertTrue(dates.dropFirst().allSatisfy { c.component(.hour, from: $0) == 0 })
+        XCTAssertTrue(dates.dropFirst().allSatisfy { c.component(.hour, from: $0) == 6 })
         XCTAssertEqual(dates[2].timeIntervalSince(dates[1]), 23 * 3600)
     }
 

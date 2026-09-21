@@ -37,8 +37,8 @@ struct TODOFirstProvider: TimelineProvider {
 
     private func sample() -> TODOFirstEntry {
         let now = Date.now
-        let tasks = [TodoItem(title: "책 10쪽 읽기", repeatRule: .daily, startDate: now),
-                     TodoItem(title: "가볍게 산책하기", startDate: now)]
+        let tasks = [TodoItem(title: "책 10쪽 읽기", repeatRule: .daily, startDate: TaskClock.dayDate(for: now)),
+                     TodoItem(title: "가볍게 산책하기", startDate: TaskClock.dayDate(for: now))]
         return TODOFirstEntry(date: now, model: WidgetDayModel(date: now, records: tasks))
     }
 }

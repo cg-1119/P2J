@@ -15,7 +15,7 @@ struct TodayView: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
-            content(on: context.date)
+            content(on: TaskClock.dayDate(for: context.date))
         }
         .sheet(isPresented: $showingNewTask) {
             NewTaskView()
@@ -128,7 +128,7 @@ struct TodayView: View {
                 Button("위젯 보기") { openWindow(id: "widgets") }
                     .buttonStyle(.link)
                 Spacer()
-                Text("반복 일정은 해당하는 날 자동으로 표시돼요")
+                Text("하루는 오전 6시에 시작돼요")
             }
             .font(.caption).foregroundStyle(.secondary)
         }

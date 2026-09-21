@@ -1,5 +1,21 @@
 import Foundation
 
+/// 실제 시각을 오전 6시에 시작하는 작업일의 정오로 변환합니다.
+/// 날짜 선택값과 저장된 TaskDay는 달력 날짜 그대로 유지합니다.
+enum TaskClock {
+    static func dayDate(for instant: Date = .now, calendar: Calendar = .current) -> Date {
+        let start = calendar.startOfDay(for: instant)
+        let boundary = calendar.date(bySettingHour: 6, minute: 0, second: 0, of: start)!
+        let day = instant < boundary ? calendar.date(byAdding: .day, value: -1, to: start)! : start
+        return calendar.date(bySettingHour: 12, minute: 0, second: 0, of: day)!
+    }
+
+    static func nextBoundary(after instant: Date, calendar: Calendar = .current) -> Date {
+        calendar.nextDate(after: instant, matching: DateComponents(hour: 6, minute: 0, second: 0),
+                          matchingPolicy: .nextTime)!
+    }
+}
+
 /// 달력 날짜를 저장해 시간대가 바뀌어도 등록한 날짜가 이동하지 않게 합니다.
 struct TaskDay: Codable, Hashable, Comparable, Sendable {
     let year: Int

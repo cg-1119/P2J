@@ -66,6 +66,7 @@ struct WidgetDayModel {
     var progress: Double { total == 0 ? 0 : Double(completed) / Double(total) }
 
     init(date: Date, records: [TodoItem], calendar: Calendar = .current) {
+        let date = TaskClock.dayDate(for: date, calendar: calendar)
         self.date = date
         let today = records.filter { $0.archivedOn == nil && $0.occurs(on: date, calendar: calendar) }
         total = today.count
@@ -74,10 +75,12 @@ struct WidgetDayModel {
                                           on: date, calendar: calendar)
     }
 
-    /// 갱신이 늦어져도 자정에 다음 날 일정으로 바뀌도록 미래 엔트리를 준비합니다.
+    /// 오전 6시마다 다음 작업일을 표시할 미래 엔트리를 준비합니다.
     static func timelineDates(from date: Date, calendar: Calendar = .current) -> [Date] {
-        [date] + (1...7).compactMap {
-            calendar.date(byAdding: .day, value: $0, to: calendar.startOfDay(for: date))
+        var dates = [date]
+        for _ in 0..<7 {
+            dates.append(TaskClock.nextBoundary(after: dates.last!, calendar: calendar))
         }
+        return dates
     }
 }

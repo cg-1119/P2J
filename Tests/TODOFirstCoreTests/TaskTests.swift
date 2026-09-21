@@ -309,4 +309,36 @@ final class TaskTests: XCTestCase {
         XCTAssertTrue(store.items.isEmpty)
     }
 
+    @MainActor func testSixAMBoundaryPreservesOvernightCompletionAndNextDayResets() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let store = TaskStore(repository: repo)
+        let task = item(.daily)
+        XCTAssertTrue(store.add(task))
+        let before = date(22, hour: 6).addingTimeInterval(-1)
+        let boundary = date(22, hour: 6)
+        XCTAssertEqual(TaskDay(TaskClock.dayDate(for: date(22, hour: 0), calendar: calendar), calendar: calendar), TaskDay(date(21), calendar: calendar))
+        XCTAssertEqual(TaskDay(TaskClock.dayDate(for: before, calendar: calendar), calendar: calendar), TaskDay(date(21), calendar: calendar))
+        XCTAssertEqual(TaskDay(TaskClock.dayDate(for: boundary, calendar: calendar), calendar: calendar), TaskDay(date(22), calendar: calendar))
+        XCTAssertTrue(store.toggleCompletion(task, on: before, calendar: calendar))
+        XCTAssertTrue(store.items[0].isCompleted(on: date(21), calendar: calendar))
+        XCTAssertEqual(WidgetDayModel(date: before, records: store.records, calendar: calendar).completed, 1)
+        XCTAssertEqual(WidgetDayModel(date: boundary, records: store.records, calendar: calendar).completed, 0)
+        XCTAssertEqual(TaskStatistics.day(TaskClock.dayDate(for: before, calendar: calendar), records: store.records, calendar: calendar).completed, 1)
+        XCTAssertEqual(WidgetDayModel.timelineDates(from: before, calendar: calendar)[1], boundary)
+        XCTAssertEqual(WidgetDayModel.timelineDates(from: boundary, calendar: calendar)[1], date(23, hour: 6))
+        XCTAssertTrue(store.remove(task, on: before, calendar: calendar))
+        XCTAssertEqual(store.records[0].archivedOn, TaskDay(date(21), calendar: calendar))
+    }
+
+    func testSixAMBoundaryAcrossMonthAndWeekdayKeepsExplicitDates() {
+        let overnight = date(1, month: 10, hour: 3)
+        XCTAssertEqual(TaskDay(TaskClock.dayDate(for: overnight, calendar: calendar), calendar: calendar), TaskDay(date(30), calendar: calendar))
+        let fridayTask = item(.weekdays)
+        XCTAssertTrue(fridayTask.occurs(on: TaskClock.dayDate(for: date(26, hour: 5), calendar: calendar), calendar: calendar))
+        XCTAssertFalse(fridayTask.occurs(on: TaskClock.dayDate(for: date(26, hour: 6), calendar: calendar), calendar: calendar))
+        let explicit = TodoItem(title: "날짜 지정", startDate: date(22, hour: 0), calendar: calendar)
+        XCTAssertEqual(explicit.startDay, TaskDay(date(22), calendar: calendar))
+    }
+
 }

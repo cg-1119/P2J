@@ -43,12 +43,13 @@ final class TaskStore {
     func remove(_ item: TodoItem, on date: Date = .now, calendar: Calendar = .current) -> Bool {
         guard let index = records.firstIndex(where: { $0.id == item.id && $0.archivedOn == nil }) else { return false }
         var next = records
-        next[index].archivedOn = TaskDay(date, calendar: calendar)
+        next[index].archivedOn = TaskDay(TaskClock.dayDate(for: date, calendar: calendar), calendar: calendar)
         return persist(next)
     }
 
     @discardableResult
     func toggleCompletion(_ item: TodoItem, on date: Date = .now, calendar: Calendar = .current) -> Bool {
+        let date = TaskClock.dayDate(for: date, calendar: calendar)
         guard let index = records.firstIndex(where: { $0.id == item.id }),
               records[index].archivedOn == nil,
               records[index].occurs(on: date, calendar: calendar) else { return false }
