@@ -2,3 +2,6 @@
 DEVELOPMENT_TEAM = YOUR_TEAM_ID
 // 필요하면 자신이 등록한 고유 식별자로 변경하세요.
 BUNDLE_ID_PREFIX = com.cg1119.todofirst
+
+// 필요하면 두 타깃이 공유할 macOS App Group을 변경하세요. 팀 ID 접두어를 유지합니다.
+// P2J_APP_GROUP = $(DEVELOPMENT_TEAM).com.yourname.p2j

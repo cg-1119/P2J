@@ -9,5 +9,7 @@ GENERATE_INFOPLIST_FILE = YES
 PRODUCT_NAME = $(TARGET_NAME)
 PRODUCT_BUNDLE_IDENTIFIER = $(BUNDLE_ID_PREFIX).$(TARGET_NAME)
 BUNDLE_ID_PREFIX = com.cg1119.todofirst
+// macOS App Group: 동일한 개발 팀의 앱과 위젯이 공유합니다.
+P2J_APP_GROUP = $(DEVELOPMENT_TEAM).com.cg1119.p2j
 // 복사본에 개인 서명 설정을 입력합니다. Git에는 포함되지 않습니다.
 #include? "Local.xcconfig"

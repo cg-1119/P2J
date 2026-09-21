@@ -7,6 +7,7 @@ private enum TaskFilter: String, CaseIterable, Identifiable {
 
 struct TodayView: View {
     @Environment(TaskStore.self) private var store
+    @Environment(\.openWindow) private var openWindow
     @State private var filter: TaskFilter = .today
     @State private var showingNewTask = false
     @State private var pendingDeletion: TodoItem?
@@ -117,6 +118,8 @@ struct TodayView: View {
             HStack(spacing: 6) {
                 Image(systemName: "internaldrive")
                 Text("이 Mac에 저장됨")
+                Button("위젯 보기") { openWindow(id: "widgets") }
+                    .buttonStyle(.link)
                 Spacer()
                 Text("반복 일정은 해당하는 날 자동으로 표시돼요")
             }
