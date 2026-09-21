@@ -63,13 +63,17 @@ struct TodayView: View {
                 .disabled(!store.isReady)
             }
 
-            Picker("보기", selection: $filter) {
-                ForEach(TaskFilter.allCases) { filter in
-                    Text(filter.rawValue).tag(filter)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("보기").font(.subheadline.weight(.medium))
+                Picker("보기", selection: $filter) {
+                    ForEach(TaskFilter.allCases) { filter in
+                        Text(filter.rawValue).tag(filter)
+                    }
                 }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 340)
             }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 340)
 
             if let error = store.errorMessage {
                 HStack {
