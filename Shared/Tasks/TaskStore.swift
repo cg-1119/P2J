@@ -3,7 +3,8 @@ import Observation
 
 @MainActor @Observable
 final class TaskStore {
-    private(set) var items: [TodoItem] = []
+    private(set) var records: [TodoItem] = []
+    var items: [TodoItem] { records.filter { $0.archivedOn == nil } }
     private(set) var errorMessage: String?
     private(set) var isReady = false
     private let repository: TaskRepository?
@@ -21,7 +22,7 @@ final class TaskStore {
     func reload() {
         guard let repository else { return }
         do {
-            items = try repository.load()
+            records = try repository.load()
             isReady = true
             errorMessage = nil
         } catch {
@@ -32,19 +33,37 @@ final class TaskStore {
 
     @discardableResult
     func add(_ item: TodoItem) -> Bool {
-        persist(items + [item])
+        persist(records + [item])
     }
 
     @discardableResult
-    func remove(_ item: TodoItem) -> Bool {
-        persist(items.filter { $0.id != item.id })
+    func remove(_ item: TodoItem, on date: Date = .now, calendar: Calendar = .current) -> Bool {
+        guard let index = records.firstIndex(where: { $0.id == item.id && $0.archivedOn == nil }) else { return false }
+        var next = records
+        next[index].archivedOn = TaskDay(date, calendar: calendar)
+        return persist(next)
+    }
+
+    @discardableResult
+    func toggleCompletion(_ item: TodoItem, on date: Date = .now, calendar: Calendar = .current) -> Bool {
+        guard let index = records.firstIndex(where: { $0.id == item.id }),
+              records[index].archivedOn == nil,
+              records[index].occurs(on: date, calendar: calendar) else { return false }
+        var next = records
+        let day = TaskDay(date, calendar: calendar)
+        if next[index].completedDays.contains(day) {
+            next[index].completedDays.remove(day)
+        } else {
+            next[index].completedDays.insert(day)
+        }
+        return persist(next)
     }
 
     private func persist(_ next: [TodoItem]) -> Bool {
         guard isReady, let repository else { return false }
         do {
             try repository.save(next)
-            items = next
+            records = next
             errorMessage = nil
             return true
         } catch {

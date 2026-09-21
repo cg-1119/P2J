@@ -103,7 +103,8 @@ final class TaskTests: XCTestCase {
         let reopened = TaskStore(repository: repo)
         XCTAssertEqual(reopened.items, [task])
         XCTAssertTrue(reopened.remove(task))
-        XCTAssertEqual(try repo.load(), [])
+        XCTAssertTrue(reopened.items.isEmpty)
+        XCTAssertNotNil(try repo.load().first?.archivedOn)
     }
 
     @MainActor func testFailedSaveDoesNotPublishUnsavedItems() throws {
@@ -117,4 +118,57 @@ final class TaskTests: XCTestCase {
         XCTAssertTrue(store.items.isEmpty)
         XCTAssertNotNil(store.errorMessage)
     }
+    @MainActor func testCompletionIsPerDayPersistsAndCanBeUndone() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let task = item(.daily)
+        let store = TaskStore(repository: repo)
+        XCTAssertTrue(store.add(task))
+        XCTAssertTrue(store.toggleCompletion(task, on: date(21), calendar: calendar))
+        let reopened = TaskStore(repository: repo)
+        XCTAssertTrue(reopened.items[0].isCompleted(on: date(21), calendar: calendar))
+        XCTAssertFalse(reopened.items[0].isCompleted(on: date(22), calendar: calendar))
+        XCTAssertTrue(reopened.toggleCompletion(task, on: date(21), calendar: calendar))
+        XCTAssertFalse(reopened.items[0].isCompleted(on: date(21), calendar: calendar))
+    }
+
+    @MainActor func testCompletionRejectsNonScheduledDayAndArchivedTask() {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let store = TaskStore(repository: repo)
+        let task = item(.weekdays)
+        XCTAssertTrue(store.add(task))
+        XCTAssertFalse(store.toggleCompletion(task, on: date(26), calendar: calendar))
+        XCTAssertTrue(store.remove(task, on: date(22), calendar: calendar))
+        XCTAssertFalse(store.toggleCompletion(task, on: date(21), calendar: calendar))
+    }
+
+    func testVersionOneDataLoadsWithoutCompletionFields() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let task = item(.once)
+        try repo.save([task])
+        var document = try JSONSerialization.jsonObject(with: Data(contentsOf: repo.fileURL)) as! [String: Any]
+        var items = document["items"] as! [[String: Any]]
+        items[0].removeValue(forKey: "completedDays")
+        document["items"] = items
+        document["version"] = 1
+        try JSONSerialization.data(withJSONObject: document).write(to: repo.fileURL)
+        let loaded = try repo.load()
+        XCTAssertEqual(loaded[0].id, task.id)
+        XCTAssertTrue(loaded[0].completedDays.isEmpty)
+    }
+
+    @MainActor func testFailedCompletionSaveKeepsPreviousState() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let store = TaskStore(repository: repo)
+        let task = item(.daily)
+        XCTAssertTrue(store.add(task))
+        try FileManager.default.removeItem(at: repo.fileURL)
+        try FileManager.default.createDirectory(at: repo.fileURL, withIntermediateDirectories: true)
+        XCTAssertFalse(store.toggleCompletion(task, on: date(21), calendar: calendar))
+        XCTAssertFalse(store.items[0].isCompleted(on: date(21), calendar: calendar))
+    }
+
 }

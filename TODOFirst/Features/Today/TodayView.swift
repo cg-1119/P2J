@@ -34,21 +34,23 @@ struct TodayView: View {
             if let item = pendingDeletion {
                 Text(item.repeatRule == .once
                      ? "‘\(item.title)’ 항목을 삭제합니다."
-                     : "‘\(item.title)’ 반복 일정 전체가 삭제되며 앞으로 목록에 표시되지 않습니다.")
+                     : "‘\(item.title)’ 반복 일정이 앞으로 목록에 표시되지 않습니다. 과거 완료 기록은 통계에 남습니다.")
             }
         }
     }
 
     private func content(on date: Date) -> some View {
         let tasks = filtered(on: date)
-        let todayCount = store.items.filter { $0.occurs(on: date) }.count
+        let todayItems = store.items.filter { $0.occurs(on: date) }
+        let todayCount = todayItems.count
+        let completedCount = todayItems.filter { $0.isCompleted(on: date) }.count
         return VStack(alignment: .leading, spacing: 22) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 7) {
                     Text(date, format: .dateTime.month().day().weekday())
                         .font(.subheadline).foregroundStyle(.secondary)
                     Text("오늘, 중요한 것부터").font(.largeTitle.bold())
-                    Text(todayCount == 0 ? "작은 일 하나부터 시작해보세요." : "오늘 할 일 \(todayCount)개가 기다리고 있어요.")
+                    Text(todayCount == 0 ? "작은 일 하나부터 시작해보세요." : "오늘 \(todayCount)개 중 \(completedCount)개 완료했어요.")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -100,7 +102,9 @@ struct TodayView: View {
                 ScrollView {
                     LazyVStack(spacing: 10) {
                         ForEach(tasks) { item in
-                            TaskRow(item: item) { pendingDeletion = item }
+                            TaskRow(item: item, date: date,
+                                    onToggle: { store.toggleCompletion(item) },
+                                    onDelete: { pendingDeletion = item })
                                 .disabled(!store.isReady)
                         }
                     }
@@ -150,18 +154,24 @@ struct TodayView: View {
 
 private struct TaskRow: View {
     let item: TodoItem
+    let date: Date
+    let onToggle: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            Image(systemName: item.repeatRule == .once ? "calendar" : "repeat")
-                .font(.title3)
-                .foregroundStyle(item.repeatRule == .once ? Color.orange : Color.teal)
-                .frame(width: 36, height: 36)
-                .background((item.repeatRule == .once ? Color.orange : Color.teal).opacity(0.1),
-                            in: RoundedRectangle(cornerRadius: 10))
+            Toggle(isOn: Binding(get: { item.isCompleted(on: date) }, set: { _ in onToggle() })) {
+                Text("\(item.title) 오늘 완료")
+            }
+            .labelsHidden()
+            .toggleStyle(.checkbox)
+            .disabled(!item.occurs(on: date))
+            .help(item.occurs(on: date) ? "오늘 완료 표시 또는 취소" : "오늘 해당하지 않는 일정입니다")
+            .padding(.top, 3)
             VStack(alignment: .leading, spacing: 5) {
                 Text(item.title).font(.headline).textSelection(.enabled)
+                    .strikethrough(item.isCompleted(on: date))
+                    .foregroundStyle(item.isCompleted(on: date) ? .secondary : .primary)
                 if !item.note.isEmpty {
                     Text(item.note).font(.callout).foregroundStyle(.secondary)
                         .lineLimit(2).help(item.note)

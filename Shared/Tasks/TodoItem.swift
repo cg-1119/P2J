@@ -1,7 +1,7 @@
 import Foundation
 
 /// 달력 날짜를 저장해 시간대가 바뀌어도 등록한 날짜가 이동하지 않게 합니다.
-struct TaskDay: Codable, Equatable, Comparable, Sendable {
+struct TaskDay: Codable, Hashable, Comparable, Sendable {
     let year: Int
     let month: Int
     let day: Int
@@ -60,6 +60,8 @@ struct TodoItem: Codable, Identifiable, Equatable, Sendable {
     var repeatRule: TaskRepeat
     var startDay: TaskDay
     let createdAt: Date
+    var completedDays: Set<TaskDay> = []
+    var archivedOn: TaskDay?
 
     init(id: UUID = UUID(), title: String, note: String = "", repeatRule: TaskRepeat = .once,
          startDate: Date = .now, createdAt: Date = .now, calendar: Calendar = .current) {
@@ -71,9 +73,31 @@ struct TodoItem: Codable, Identifiable, Equatable, Sendable {
         self.createdAt = createdAt
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case id, title, note, repeatRule, startDay, createdAt, completedDays, archivedOn
+    }
+
+    // v1 파일에 없던 완료 기록은 빈 목록으로 읽습니다.
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        title = try values.decode(String.self, forKey: .title)
+        note = try values.decode(String.self, forKey: .note)
+        repeatRule = try values.decode(TaskRepeat.self, forKey: .repeatRule)
+        startDay = try values.decode(TaskDay.self, forKey: .startDay)
+        createdAt = try values.decode(Date.self, forKey: .createdAt)
+        completedDays = try values.decodeIfPresent(Set<TaskDay>.self, forKey: .completedDays) ?? []
+        archivedOn = try values.decodeIfPresent(TaskDay.self, forKey: .archivedOn)
+    }
+
+    func isCompleted(on date: Date, calendar: Calendar = .current) -> Bool {
+        completedDays.contains(TaskDay(date, calendar: calendar))
+    }
+
     func occurs(on date: Date, calendar: Calendar = .current) -> Bool {
         let day = TaskDay(date, calendar: calendar)
         guard day >= startDay else { return false }
+        if let archivedOn, day >= archivedOn { return false }
         switch repeatRule {
         case .once: return day == startDay
         case .daily: return true
