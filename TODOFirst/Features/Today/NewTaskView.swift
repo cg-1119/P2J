@@ -10,6 +10,17 @@ struct NewTaskView: View {
     @State private var priority: TaskPriority = .normal
     @State private var date = Date.now
 
+    private let editingItem: TodoItem?
+
+    init(item: TodoItem? = nil) {
+        editingItem = item
+        _title = State(initialValue: item?.title ?? "")
+        _note = State(initialValue: item?.note ?? "")
+        _repeatRule = State(initialValue: item?.repeatRule ?? .once)
+        _priority = State(initialValue: item?.priority ?? .normal)
+        _date = State(initialValue: item?.startDay.date() ?? .now)
+    }
+
     private var valid: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && title.count <= 120 && note.count <= 2000 && store.isReady
@@ -18,8 +29,8 @@ struct NewTaskView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("새로운 할 일").font(.title2.bold())
-                Text("오늘 한 번, 또는 꾸준히 할 일을 정해보세요.")
+                Text(editingItem == nil ? "새로운 할 일" : "할 일 수정").font(.title2.bold())
+                Text(editingItem == nil ? "오늘 한 번, 또는 꾸준히 할 일을 정해보세요." : "변경할 내용을 확인하고 저장하세요.")
                     .foregroundStyle(.secondary)
             }
             .padding(24)
@@ -65,6 +76,12 @@ struct NewTaskView: View {
                             .controlSize(.small)
                     }
                 }
+                if editingItem != nil {
+                    Section {
+                        Text("반복 일정 전체에 적용돼요. 완료 기록은 유지되며, 날짜·반복 변경 시 과거 계획 수가 다시 계산돼요.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
                 if let error = store.errorMessage {
                     Section {
                         Label(error, systemImage: "exclamationmark.triangle")
@@ -81,9 +98,16 @@ struct NewTaskView: View {
                 Spacer()
                 Button("취소") { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                Button("등록") {
-                    let item = TodoItem(title: title, note: note, repeatRule: repeatRule, startDate: date, priority: priority)
-                    if store.add(item) { dismiss() }
+                Button(editingItem == nil ? "등록" : "저장") {
+                    let saved: Bool
+                    if let editingItem {
+                        saved = store.update(editingItem, title: title, note: note, repeatRule: repeatRule,
+                                             startDate: date, priority: priority)
+                    } else {
+                        saved = store.add(TodoItem(title: title, note: note, repeatRule: repeatRule,
+                                                  startDate: date, priority: priority))
+                    }
+                    if saved { dismiss() }
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
@@ -92,7 +116,7 @@ struct NewTaskView: View {
             }
             .padding(20)
         }
-        .frame(width: 520, height: 550)
+        .frame(width: 520, height: editingItem == nil ? 550 : 640)
         .onAppear { titleFocused = true }
     }
 }

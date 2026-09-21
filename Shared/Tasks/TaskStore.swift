@@ -70,6 +70,23 @@ final class TaskStore {
         return persist(next)
     }
 
+    /// 수정한 필드만 반영해 최신 완료 기록과 식별자를 유지합니다.
+    @discardableResult
+    func update(_ item: TodoItem, title: String, note: String, repeatRule: TaskRepeat,
+                startDate: Date, priority: TaskPriority, calendar: Calendar = .current) -> Bool {
+        guard let index = records.firstIndex(where: { $0.id == item.id && $0.archivedOn == nil }) else {
+            errorMessage = "수정할 할 일을 찾지 못했어요. 목록을 다시 확인해주세요."
+            return false
+        }
+        var next = records
+        next[index].title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        next[index].note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        next[index].repeatRule = repeatRule
+        next[index].startDay = TaskDay(startDate, calendar: calendar)
+        next[index].priority = priority
+        return persist(next)
+    }
+
     private func persist(_ next: [TodoItem]) -> Bool {
         guard isReady, let repository else { return false }
         do {

@@ -255,4 +255,58 @@ final class TaskTests: XCTestCase {
         XCTAssertEqual(model.remainingItems.map(\.id), [high.id, low.id])
     }
 
+    @MainActor func testEditingPreservesLatestCompletionAndIdentityAndPersistsSchedule() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        var published: [TodoItem] = []
+        let store = TaskStore(repository: repo, didChange: { published = $0 })
+        let original = item(.daily)
+        XCTAssertTrue(store.add(original))
+        // 편집 창을 연 뒤 다른 화면에서 체크한 기록도 덮어쓰지 않습니다.
+        XCTAssertTrue(store.toggleCompletion(original, on: date(21), calendar: calendar))
+        XCTAssertTrue(store.update(original, title: "  수정한 제목  ", note: " 메모 ", repeatRule: .weekly,
+                                   startDate: date(22), priority: .high, calendar: calendar))
+        let restored = try XCTUnwrap(try repo.load().first)
+        XCTAssertEqual(restored.id, original.id)
+        XCTAssertEqual(restored.createdAt, original.createdAt)
+        XCTAssertEqual(restored.title, "수정한 제목")
+        XCTAssertEqual(restored.note, "메모")
+        XCTAssertEqual(restored.priority, .high)
+        XCTAssertEqual(restored.repeatRule, .weekly)
+        XCTAssertFalse(restored.occurs(on: date(21), calendar: calendar))
+        XCTAssertTrue(restored.occurs(on: date(29), calendar: calendar))
+        XCTAssertTrue(restored.isCompleted(on: date(21), calendar: calendar))
+        XCTAssertEqual(TaskStatistics.day(date(21), records: [restored], calendar: calendar).completed, 1)
+        XCTAssertEqual(published, [restored])
+        XCTAssertEqual(WidgetDayModel(date: date(22), records: published, calendar: calendar).remainingItems.first?.title, "수정한 제목")
+    }
+
+    @MainActor func testInvalidOrFailedEditKeepsOriginalAndRejectsDeletedItems() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let store = TaskStore(repository: repo)
+        let original = item(.once)
+        XCTAssertTrue(store.add(original))
+        let savedData = try Data(contentsOf: repo.fileURL)
+        for title in ["   ", String(repeating: "가", count: 121)] {
+            XCTAssertFalse(store.update(original, title: title, note: "", repeatRule: .daily,
+                                        startDate: date(22), priority: .low, calendar: calendar))
+            XCTAssertEqual(store.items, [original])
+            XCTAssertEqual(try Data(contentsOf: repo.fileURL), savedData)
+        }
+        XCTAssertFalse(store.update(original, title: "수정", note: String(repeating: "가", count: 2001),
+                                    repeatRule: .daily, startDate: date(22), priority: .low))
+        try FileManager.default.removeItem(at: repo.fileURL)
+        try FileManager.default.createDirectory(at: repo.fileURL, withIntermediateDirectories: true)
+        XCTAssertFalse(store.update(original, title: "수정", note: "", repeatRule: .daily,
+                                    startDate: date(22), priority: .low))
+        XCTAssertEqual(store.items, [original])
+        XCTAssertNotNil(store.errorMessage)
+        try FileManager.default.removeItem(at: repo.fileURL)
+        XCTAssertTrue(store.remove(original))
+        XCTAssertFalse(store.update(original, title: "수정", note: "", repeatRule: .daily,
+                                    startDate: date(22), priority: .low))
+        XCTAssertTrue(store.items.isEmpty)
+    }
+
 }

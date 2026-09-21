@@ -10,6 +10,7 @@ struct TodayView: View {
     @Environment(\.openWindow) private var openWindow
     @State private var filter: TaskFilter = .today
     @State private var showingNewTask = false
+    @State private var editingItem: TodoItem?
     @State private var pendingDeletion: TodoItem?
 
     var body: some View {
@@ -18,6 +19,10 @@ struct TodayView: View {
         }
         .sheet(isPresented: $showingNewTask) {
             NewTaskView()
+                .environment(store)
+        }
+        .sheet(item: $editingItem) { item in
+            NewTaskView(item: item)
                 .environment(store)
         }
         .confirmationDialog("할 일을 삭제할까요?", isPresented: Binding(
@@ -108,6 +113,7 @@ struct TodayView: View {
                             TaskRow(item: item, date: date,
                                     onToggle: { store.toggleCompletion(item) },
                                     onPriority: { store.setPriority($0, for: item) },
+                                    onEdit: { editingItem = item },
                                     onDelete: { pendingDeletion = item })
                                 .disabled(!store.isReady)
                         }
@@ -166,6 +172,7 @@ private struct TaskRow: View {
     let date: Date
     let onToggle: () -> Void
     let onPriority: (TaskPriority) -> Void
+    let onEdit: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
@@ -198,6 +205,11 @@ private struct TaskRow: View {
             }
             Spacer(minLength: 8)
             TaskPriorityPicker(title: item.title, priority: Binding(get: { item.priority }, set: onPriority))
+            Button(action: onEdit) { Image(systemName: "pencil") }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help("할 일 수정")
+                .accessibilityLabel("\(item.title) 수정")
             Button(action: onDelete) { Image(systemName: "trash") }
                 .buttonStyle(.borderless)
                 .foregroundStyle(.secondary)
