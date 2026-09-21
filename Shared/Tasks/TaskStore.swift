@@ -8,8 +8,10 @@ final class TaskStore {
     private(set) var errorMessage: String?
     private(set) var isReady = false
     private let repository: TaskRepository?
+    private let didChange: ([TodoItem]) -> Void
 
-    init(repository: TaskRepository? = nil) {
+    init(repository: TaskRepository? = nil, didChange: @escaping ([TodoItem]) -> Void = { _ in }) {
+        self.didChange = didChange
         do {
             self.repository = try repository ?? TaskRepository.local()
         } catch {
@@ -25,6 +27,7 @@ final class TaskStore {
             records = try repository.load()
             isReady = true
             errorMessage = nil
+            didChange(records)
         } catch {
             isReady = false
             errorMessage = "할 일을 불러오지 못했어요. 기존 파일을 보호하기 위해 변경을 멈췄습니다. \(error.localizedDescription)"
@@ -65,6 +68,7 @@ final class TaskStore {
             try repository.save(next)
             records = next
             errorMessage = nil
+            didChange(records)
             return true
         } catch {
             errorMessage = "저장하지 못했어요. 입력 내용을 유지한 채 다시 시도해주세요. \(error.localizedDescription)"
