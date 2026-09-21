@@ -45,7 +45,7 @@ struct TODOFirstWidget: Widget {
         StaticConfiguration(kind: AppIdentity.widgetKind, provider: TODOFirstProvider()) { entry in
             TODOFirstWidgetView(entry: entry)
         }
-        .configurationDisplayName("TODO First")
+        .configurationDisplayName("P2J")
         .description("오늘의 중요한 할 일을 확인하는 위젯입니다. 현재 개발 중입니다.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }

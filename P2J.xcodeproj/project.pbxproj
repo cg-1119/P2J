@@ -54,7 +54,7 @@
 		0C907BD3069C76082245B99D /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
 		25CE3F2AE8DDEA20177A7DD6 /* TodayView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TodayView.swift; path = TodayView.swift; sourceTree = "<group>"; };
 		3A78EB577F0F5B6F89CAFE55 /* TodoItem.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TodoItem.swift; sourceTree = "<group>"; };
-		426215027B59C72590DD02A2 /* TODOFirst.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TODOFirst.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		426215027B59C72590DD02A2 /* P2J.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = P2J.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		95556B72EBAF6486FACF57BE /* NewTaskView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewTaskView.swift; sourceTree = "<group>"; };
 		A6F98BBFCD4031492C772934 /* TaskStatistics.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskStatistics.swift; sourceTree = "<group>"; };
 		B4B961CD3FF0485726C23377 /* Local.xcconfig.example */ = {isa = PBXFileReference; includeInIndex = 1; name = Local.xcconfig.example; path = Local.xcconfig.example; sourceTree = "<group>"; };
@@ -195,7 +195,7 @@
 		B8AEBAAA44427B58F03EB200 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				426215027B59C72590DD02A2 /* TODOFirst.app */,
+				426215027B59C72590DD02A2 /* P2J.app */,
 				C24B91CC5716EF37BF0F9B15 /* TODOFirstWidgets.appex */,
 			);
 			name = Products;
@@ -248,7 +248,7 @@
 			);
 			name = TODOFirst;
 			productName = TODOFirst;
-			productReference = 426215027B59C72590DD02A2 /* TODOFirst.app */;
+			productReference = 426215027B59C72590DD02A2 /* P2J.app */;
 			productType = "com.apple.product-type.application";
 		};
 		BCAC8E3E9E9C04D8F9D88556 /* TODOFirstWidgets */ = {
@@ -363,7 +363,7 @@
 				CODE_SIGN_ENTITLEMENTS = TODOFirstWidgets/TODOFirstWidgets.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = TODOFirstWidgets/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "TODO First";
+				INFOPLIST_KEY_CFBundleDisplayName = P2J;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @executable_path/../../../../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(BUNDLE_ID_PREFIX).TODOFirst.Widgets";
@@ -379,7 +379,7 @@
 				CODE_SIGN_ENTITLEMENTS = TODOFirstWidgets/TODOFirstWidgets.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = TODOFirstWidgets/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "TODO First";
+				INFOPLIST_KEY_CFBundleDisplayName = P2J;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @executable_path/../../../../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(BUNDLE_ID_PREFIX).TODOFirst.Widgets";
@@ -512,10 +512,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = TODOFirst/TODOFirst.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "TODO First";
+				INFOPLIST_KEY_CFBundleDisplayName = P2J;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_NAME = P2J;
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -527,10 +528,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = TODOFirst/TODOFirst.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "TODO First";
+				INFOPLIST_KEY_CFBundleDisplayName = P2J;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_NAME = P2J;
 				SDKROOT = macosx;
 			};
 			name = Debug;
