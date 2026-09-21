@@ -20,3 +20,6 @@ xcuserdata/
 *.p12
 *.mobileprovision
 *.provisionprofile
+
+# Personal signing configuration
+Configuration/Local.xcconfig
