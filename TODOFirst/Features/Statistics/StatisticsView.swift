@@ -7,7 +7,8 @@ struct StatisticsView: View {
     @State private var days = 7
 
     var body: some View {
-        let today = TaskStatistics.day(date, records: records)
+        let model = WidgetDayModel(date: date, records: records)
+        let today = DayStatistics(date: date, total: model.total, completed: model.completed)
         let history = TaskStatistics.recent(days, through: date, records: records)
         let total = history.reduce(0) { $0 + $1.total }
         let completed = history.reduce(0) { $0 + $1.completed }

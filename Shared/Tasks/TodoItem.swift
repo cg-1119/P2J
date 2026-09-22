@@ -38,11 +38,13 @@ struct TaskDay: Codable, Hashable, Comparable, Sendable {
 }
 
 enum TaskRepeat: String, Codable, CaseIterable, Identifiable, Sendable {
-    case once, daily, weekdays, weekly
+    case once, daily, weekdays, weekly, period
+    static var selectable: [Self] { [.once, .period, .daily, .weekly] }
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .period: "기간 작업"
         case .once: "하루만"
         case .daily: "매일"
         case .weekdays: "평일마다"
@@ -52,6 +54,7 @@ enum TaskRepeat: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var symbol: String {
         switch self {
+        case .period: "calendar.badge.checkmark"
         case .once: "calendar"
         case .daily: "repeat"
         case .weekdays: "calendar.badge.clock"
@@ -61,6 +64,7 @@ enum TaskRepeat: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var explanation: String {
         switch self {
+        case .period: "시작일부터 종료일까지 표시하고, 한 번 완료하면 끝나는 작업이에요."
         case .once: "오늘 또는 지정한 날짜에 한 번만 표시해요."
         case .daily: "시작일부터 매일 오늘의 목록에 표시해요."
         case .weekdays: "시작일부터 월요일~금요일에 표시해요. 공휴일도 포함해요."
@@ -81,6 +85,12 @@ enum TaskPriority: Int, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+struct Subtask: Codable, Identifiable, Equatable, Sendable {
+    var id: UUID = UUID()
+    var title: String
+    var completedDays: Set<TaskDay> = []
+}
+
 struct TodoItem: Codable, Identifiable, Equatable, Sendable {
     let id: UUID
     var title: String
@@ -88,23 +98,27 @@ struct TodoItem: Codable, Identifiable, Equatable, Sendable {
     var repeatRule: TaskRepeat
     var priority: TaskPriority
     var startDay: TaskDay
+    var endDay: TaskDay?
+    var subtasks: [Subtask] = []
     let createdAt: Date
     var completedDays: Set<TaskDay> = []
     var archivedOn: TaskDay?
 
     init(id: UUID = UUID(), title: String, note: String = "", repeatRule: TaskRepeat = .once,
-         startDate: Date = .now, createdAt: Date = .now, priority: TaskPriority = .normal, calendar: Calendar = .current) {
+         startDate: Date = .now, createdAt: Date = .now, priority: TaskPriority = .normal, endDate: Date? = nil, subtasks: [Subtask] = [], calendar: Calendar = .current) {
         self.id = id
         self.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         self.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
         self.repeatRule = repeatRule
         self.priority = priority
         self.startDay = TaskDay(startDate, calendar: calendar)
+        self.endDay = endDate.map { TaskDay($0, calendar: calendar) }
+        self.subtasks = subtasks
         self.createdAt = createdAt
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, note, repeatRule, startDay, createdAt, completedDays, archivedOn, priority
+        case id, title, note, repeatRule, startDay, createdAt, completedDays, archivedOn, priority, endDay, subtasks
     }
 
     // v1 파일에 없던 완료 기록은 빈 목록으로 읽습니다.
@@ -118,6 +132,8 @@ struct TodoItem: Codable, Identifiable, Equatable, Sendable {
         startDay = try values.decode(TaskDay.self, forKey: .startDay)
         createdAt = try values.decode(Date.self, forKey: .createdAt)
         completedDays = try values.decodeIfPresent(Set<TaskDay>.self, forKey: .completedDays) ?? []
+        endDay = try values.decodeIfPresent(TaskDay.self, forKey: .endDay)
+        subtasks = try values.decodeIfPresent([Subtask].self, forKey: .subtasks) ?? []
         archivedOn = try values.decodeIfPresent(TaskDay.self, forKey: .archivedOn)
     }
 
@@ -134,7 +150,8 @@ struct TodoItem: Codable, Identifiable, Equatable, Sendable {
     }
 
     func isCompleted(on date: Date, calendar: Calendar = .current) -> Bool {
-        completedDays.contains(TaskDay(date, calendar: calendar))
+        let day = TaskDay(date, calendar: calendar)
+        return repeatRule == .period ? completedDays.contains { $0 <= day } : completedDays.contains(day)
     }
 
     func occurs(on date: Date, calendar: Calendar = .current) -> Bool {
@@ -142,6 +159,7 @@ struct TodoItem: Codable, Identifiable, Equatable, Sendable {
         guard day >= startDay else { return false }
         if let archivedOn, day >= archivedOn { return false }
         switch repeatRule {
+        case .period: return endDay.map { day <= $0 } ?? false
         case .once: return day == startDay
         case .daily: return true
         case .weekdays: return (2...6).contains(calendar.component(.weekday, from: date))

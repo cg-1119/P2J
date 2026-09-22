@@ -55,6 +55,12 @@ final class TaskStore {
               records[index].occurs(on: date, calendar: calendar) else { return false }
         var next = records
         let day = TaskDay(date, calendar: calendar)
+        if next[index].repeatRule == .period {
+            if next[index].isCompleted(on: date, calendar: calendar) {
+                next[index].completedDays.removeAll()
+            } else { next[index].completedDays = [day] }
+            return persist(next)
+        }
         if next[index].completedDays.contains(day) {
             next[index].completedDays.remove(day)
         } else {
@@ -74,7 +80,7 @@ final class TaskStore {
     /// 수정한 필드만 반영해 최신 완료 기록과 식별자를 유지합니다.
     @discardableResult
     func update(_ item: TodoItem, title: String, note: String, repeatRule: TaskRepeat,
-                startDate: Date, priority: TaskPriority, calendar: Calendar = .current) -> Bool {
+                startDate: Date, priority: TaskPriority, endDate: Date? = nil, subtasks: [Subtask]? = nil, calendar: Calendar = .current) -> Bool {
         guard let index = records.firstIndex(where: { $0.id == item.id && $0.archivedOn == nil }) else {
             errorMessage = "수정할 할 일을 찾지 못했어요. 목록을 다시 확인해주세요."
             return false
@@ -85,6 +91,31 @@ final class TaskStore {
         next[index].repeatRule = repeatRule
         next[index].startDay = TaskDay(startDate, calendar: calendar)
         next[index].priority = priority
+        next[index].endDay = repeatRule == .period ? endDate.map { TaskDay($0, calendar: calendar) } : nil
+        if let subtasks {
+            next[index].subtasks = subtasks.map { draft in
+                var result = draft
+                result.title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+                result.completedDays = records[index].subtasks.first { $0.id == draft.id }?.completedDays ?? []
+                return result
+            }
+        }
+        return persist(next)
+    }
+
+    @discardableResult
+    func toggleSubtask(_ id: UUID, in item: TodoItem, on instant: Date = .now, calendar: Calendar = .current) -> Bool {
+        let date = TaskClock.dayDate(for: instant, calendar: calendar)
+        guard let i = records.firstIndex(where: { $0.id == item.id && $0.archivedOn == nil }),
+              records[i].occurs(on: date, calendar: calendar),
+              let j = records[i].subtasks.firstIndex(where: { $0.id == id }) else { return false }
+        var next = records
+        let day = TaskDay(date, calendar: calendar)
+        if next[i].repeatRule == .period {
+            if next[i].subtasks[j].completedDays.isEmpty { next[i].subtasks[j].completedDays = [day] }
+            else { next[i].subtasks[j].completedDays = [] }
+        } else if next[i].subtasks[j].completedDays.contains(day) { next[i].subtasks[j].completedDays.remove(day) }
+        else { next[i].subtasks[j].completedDays.insert(day) }
         return persist(next)
     }
 

@@ -63,7 +63,7 @@ final class TaskTests: XCTestCase {
         let repo = repository()
         defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
         let items = TaskRepeat.allCases.map { rule in
-            TodoItem(title: "  물 마시기  ", note: "  한 컵  ", repeatRule: rule, startDate: date(21))
+            TodoItem(title: "  물 마시기  ", note: "  한 컵  ", repeatRule: rule, startDate: date(21), endDate: rule == .period ? date(23) : nil)
         }
         XCTAssertEqual(try repo.load(), [])
         try repo.save(items)
@@ -339,6 +339,92 @@ final class TaskTests: XCTestCase {
         XCTAssertFalse(fridayTask.occurs(on: TaskClock.dayDate(for: date(26, hour: 6), calendar: calendar), calendar: calendar))
         let explicit = TodoItem(title: "날짜 지정", startDate: date(22, hour: 0), calendar: calendar)
         XCTAssertEqual(explicit.startDay, TaskDay(date(22), calendar: calendar))
+    }
+
+    @MainActor func testPeriodBoundsCompletionAndStatistics() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let store = TaskStore(repository: repo)
+        let task = TodoItem(title: "기간 작업", repeatRule: .period, startDate: date(21), endDate: date(23), calendar: calendar)
+        XCTAssertTrue(store.add(task))
+        XCTAssertFalse(task.occurs(on: date(20), calendar: calendar))
+        XCTAssertTrue(task.occurs(on: date(21), calendar: calendar))
+        XCTAssertTrue(task.occurs(on: date(23), calendar: calendar))
+        XCTAssertFalse(task.occurs(on: date(24), calendar: calendar))
+        XCTAssertTrue(store.toggleCompletion(task, on: date(22), calendar: calendar))
+        XCTAssertFalse(store.items[0].isCompleted(on: date(21), calendar: calendar))
+        XCTAssertTrue(store.items[0].isCompleted(on: date(23), calendar: calendar))
+        XCTAssertEqual(WidgetDayModel(date: date(23), records: store.records, calendar: calendar).completed, 1)
+        XCTAssertEqual(TaskStatistics.recent(7, through: date(27), records: store.records, calendar: calendar).reduce(0) { $0 + $1.completed }, 1)
+        XCTAssertEqual(try repo.load(), store.records)
+        XCTAssertTrue(store.toggleCompletion(task, on: date(23), calendar: calendar))
+        XCTAssertFalse(store.items[0].isCompleted(on: date(23), calendar: calendar))
+        XCTAssertFalse(store.update(task, title: task.title, note: "", repeatRule: .period, startDate: date(23), priority: .normal, endDate: date(21), calendar: calendar))
+        XCTAssertEqual(store.items[0].startDay, task.startDay)
+    }
+
+    @MainActor func testSubtasksPersistResetAndPreserveConcurrentChecksOnEdit() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let store = TaskStore(repository: repo)
+        let child = Subtask(title: "자료 조사")
+        let task = TodoItem(title: "부모", repeatRule: .daily, startDate: date(21), subtasks: [child], calendar: calendar)
+        XCTAssertTrue(store.add(task))
+        XCTAssertTrue(store.toggleSubtask(child.id, in: task, on: date(22, hour: 5), calendar: calendar))
+        XCTAssertEqual(store.items[0].subtasks[0].completedDays, [TaskDay(date(21), calendar: calendar)])
+        XCTAssertFalse(store.items[0].isCompleted(on: date(21), calendar: calendar))
+        var edited = child
+        edited.title = "자료  조사 수정"
+        XCTAssertTrue(store.update(task, title: "제목  띄어 쓰기", note: "", repeatRule: .daily, startDate: date(21), priority: .normal, subtasks: [edited], calendar: calendar))
+        XCTAssertEqual(store.items[0].title, "제목  띄어 쓰기")
+        XCTAssertEqual(store.items[0].subtasks[0].completedDays.count, 1)
+        XCTAssertFalse(store.items[0].subtasks[0].completedDays.contains(TaskDay(date(22), calendar: calendar)))
+        XCTAssertTrue(store.toggleSubtask(child.id, in: task, on: date(22, hour: 6), calendar: calendar))
+        XCTAssertEqual(try repo.load().first?.subtasks[0].completedDays.count, 2)
+        XCTAssertTrue(store.update(task, title: "부모", note: "", repeatRule: .daily, startDate: date(21), priority: .normal, subtasks: [], calendar: calendar))
+        XCTAssertFalse(store.toggleSubtask(child.id, in: task, on: date(22), calendar: calendar))
+    }
+
+    @MainActor func testPeriodSubtasksPersistUntilUndoneAndFailedSaveKeepsState() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let store = TaskStore(repository: repo)
+        let child = Subtask(title: "초안")
+        let task = TodoItem(title: "마감 작업", repeatRule: .period, startDate: date(21), endDate: date(23), subtasks: [child], calendar: calendar)
+        XCTAssertTrue(store.add(task))
+        XCTAssertTrue(store.toggleSubtask(child.id, in: task, on: date(21), calendar: calendar))
+        XCTAssertTrue(store.toggleSubtask(child.id, in: task, on: date(22), calendar: calendar))
+        XCTAssertTrue(store.items[0].subtasks[0].completedDays.isEmpty)
+        XCTAssertFalse(store.toggleSubtask(child.id, in: task, on: date(24), calendar: calendar))
+        let before = store.records
+        try FileManager.default.removeItem(at: repo.fileURL)
+        try FileManager.default.createDirectory(at: repo.fileURL, withIntermediateDirectories: true)
+        XCTAssertFalse(store.toggleSubtask(child.id, in: task, on: date(22), calendar: calendar))
+        XCTAssertEqual(before, store.records)
+    }
+
+    func testLegacySchemaAndInvalidSubtaskValidation() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        try repo.save([item(.weekdays)])
+        var document = try JSONSerialization.jsonObject(with: Data(contentsOf: repo.fileURL)) as! [String: Any]
+        var records = document["items"] as! [[String: Any]]
+        records[0].removeValue(forKey: "subtasks")
+        records[0].removeValue(forKey: "endDay")
+        document["items"] = records
+        document["version"] = 3
+        try JSONSerialization.data(withJSONObject: document).write(to: repo.fileURL)
+        let old = try XCTUnwrap(repo.load().first)
+        XCTAssertTrue(old.subtasks.isEmpty)
+        XCTAssertNil(old.endDay)
+        XCTAssertEqual(old.repeatRule, .weekdays)
+        XCTAssertFalse(TaskRepeat.selectable.contains(.weekdays))
+        var invalid = old
+        invalid.subtasks = [Subtask(title: "   ")]
+        XCTAssertThrowsError(try repo.save([invalid]))
+        let child = Subtask(title: "중복")
+        invalid.subtasks = [child, child]
+        XCTAssertThrowsError(try repo.save([invalid]))
     }
 
 }

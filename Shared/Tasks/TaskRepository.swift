@@ -33,7 +33,7 @@ struct TaskRepository {
             return []
         }
         let document = try JSONDecoder().decode(Document.self, from: data)
-        guard (1...3).contains(document.version) else { throw StorageError.unsupportedVersion }
+        guard (1...4).contains(document.version) else { throw StorageError.unsupportedVersion }
         try validate(document.items)
         return document.items
     }
@@ -42,7 +42,7 @@ struct TaskRepository {
         try validate(items)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(Document(version: 3, items: items))
+        let data = try encoder.encode(Document(version: 4, items: items))
         try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: fileURL, options: .atomic)
     }
@@ -50,6 +50,13 @@ struct TaskRepository {
     private func validate(_ items: [TodoItem]) throws {
         guard Set(items.map(\.id)).count == items.count else { throw StorageError.invalidData }
         for item in items {
+            if item.repeatRule == .period {
+                guard let end = item.endDay, end >= item.startDay else { throw StorageError.invalidData }
+            }
+            guard Set(item.subtasks.map(\.id)).count == item.subtasks.count,
+                  item.subtasks.allSatisfy({ !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.title.count <= 120 })
+            else { throw StorageError.invalidData }
+
             guard !item.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   item.title.count <= 120, item.note.count <= 2000 else { throw StorageError.invalidData }
         }

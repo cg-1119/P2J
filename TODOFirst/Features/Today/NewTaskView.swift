@@ -11,19 +11,25 @@ struct NewTaskView: View {
     @State private var priority: TaskPriority = .normal
     @State private var date = TaskClock.dayDate()
 
+    @State private var endDate = TaskClock.dayDate()
+    @State private var subtasks: [Subtask] = []
     private let editingItem: TodoItem?
 
     init(item: TodoItem? = nil) {
         editingItem = item
+        _endDate = State(initialValue: item?.endDay?.date() ?? item?.startDay.date() ?? TaskClock.dayDate())
+        _subtasks = State(initialValue: item?.subtasks ?? [])
         _title = State(initialValue: item?.title ?? "")
         _note = State(initialValue: item?.note ?? "")
-        _repeatRule = State(initialValue: item?.repeatRule ?? .once)
+        _repeatRule = State(initialValue: item?.repeatRule == .weekdays ? .daily : (item?.repeatRule ?? .once))
         _priority = State(initialValue: item?.priority ?? .normal)
         _date = State(initialValue: item?.startDay.date() ?? TaskClock.dayDate())
     }
 
     private var valid: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && (repeatRule != .period || TaskDay(endDate) >= TaskDay(date))
+            && subtasks.allSatisfy { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.title.count <= 120 }
             && title.count <= 120 && note.count <= 2000 && store.isReady
     }
 
@@ -59,8 +65,12 @@ struct NewTaskView: View {
                     .accessibilityIdentifier("taskPriority")
                 }
                 Section("언제 할까요?") {
-                    Picker("반복", selection: $repeatRule) {
-                        ForEach(TaskRepeat.allCases) { rule in
+                    if editingItem?.repeatRule == .weekdays {
+                        Text("기존 평일 일정은 저장 시 선택한 새 일정으로 변경돼요. 취소하면 그대로 유지돼요.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Picker("일정", selection: $repeatRule) {
+                        ForEach(TaskRepeat.selectable) { rule in
                             Text(rule.title).tag(rule)
                         }
                     }
@@ -69,6 +79,12 @@ struct NewTaskView: View {
 
                     DatePicker(repeatRule == .once ? "할 날짜" : "시작일", selection: $date, displayedComponents: .date)
                         .accessibilityIdentifier("taskDate")
+                    if repeatRule == .period {
+                        DatePicker("종료일", selection: $endDate, displayedComponents: .date)
+                        if TaskDay(endDate) < TaskDay(date) {
+                            Text("종료일은 시작일 이후로 선택해주세요.").foregroundStyle(.red)
+                        }
+                    }
                     HStack {
                         Text(repeatRule.explanation)
                             .font(.caption).foregroundStyle(.secondary)
@@ -76,6 +92,20 @@ struct NewTaskView: View {
                         Button("오늘", action: { date = TaskClock.dayDate() })
                             .controlSize(.small)
                     }
+                }
+                Section("하위 TODO") {
+                    ForEach($subtasks) { $subtask in
+                        HStack {
+                            TextField("하위 할 일", text: $subtask.title)
+                            Button { subtasks.removeAll { $0.id == subtask.id } } label: { Image(systemName: "minus.circle") }
+                                .buttonStyle(.borderless).accessibilityLabel("하위 할 일 삭제")
+                        }
+                    }
+                    if subtasks.contains(where: { $0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || $0.title.count > 120 }) {
+                        Text("하위 제목은 1~120자로 입력하거나 빈 항목을 삭제해주세요.").font(.caption).foregroundStyle(.red)
+                    }
+                    Button("하위 TODO 추가", systemImage: "plus") { subtasks.append(Subtask(title: "")) }
+                    Text("하위 항목은 개별 체크하며, 상위 작업 완료는 직접 체크해요.").font(.caption).foregroundStyle(.secondary)
                 }
                 if editingItem != nil {
                     Section {
@@ -104,10 +134,10 @@ struct NewTaskView: View {
                     let saved: Bool
                     if let editingItem {
                         saved = store.update(editingItem, title: title, note: note, repeatRule: repeatRule,
-                                             startDate: date, priority: priority)
+                                             startDate: date, priority: priority, endDate: repeatRule == .period ? endDate : nil, subtasks: subtasks)
                     } else {
                         saved = store.add(TodoItem(title: title, note: note, repeatRule: repeatRule,
-                                                  startDate: date, priority: priority))
+                                                  startDate: date, priority: priority, endDate: repeatRule == .period ? endDate : nil, subtasks: subtasks))
                     }
                     if saved { dismiss() }
                 }
@@ -118,7 +148,7 @@ struct NewTaskView: View {
             }
             .padding(20)
         }
-        .frame(width: 520, height: editingItem == nil ? 550 : 640)
+        .frame(width: 520, height: 720)
         .onAppear { titleFocused = true }
     }
 }

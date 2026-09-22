@@ -38,7 +38,7 @@ struct TodayView: View {
             Button("취소", role: .cancel) { pendingDeletion = nil }
         } message: {
             if let item = pendingDeletion {
-                Text(item.repeatRule == .once
+                Text(item.repeatRule == .once || item.repeatRule == .period
                      ? "‘\(item.title)’ 항목을 삭제합니다."
                      : "‘\(item.title)’ 반복 일정이 앞으로 목록에 표시되지 않습니다. 과거 완료 기록은 통계에 남습니다.")
             }
@@ -140,7 +140,7 @@ struct TodayView: View {
         let items = store.items.filter { item in
             switch filter {
             case .today: item.occurs(on: date)
-            case .recurring: item.repeatRule != .once
+            case .recurring: [.daily, .weekly, .weekdays].contains(item.repeatRule)
             case .all: true
             case .statistics: false
             }
@@ -160,7 +160,7 @@ struct TodayView: View {
     private var emptyDescription: String {
         switch filter {
         case .today: "오늘 하루만 할 일도, 매일의 작은 습관도 좋아요."
-        case .recurring: "매일·평일·매주 반복할 일을 한 번만 등록하세요."
+        case .recurring: "매일·매주 반복할 일을 한 번만 등록하세요."
         case .all: "할 일 추가 버튼이나 ⌘N으로 시작하세요."
         case .statistics: "오늘의 기록을 확인하세요."
         }
@@ -168,6 +168,7 @@ struct TodayView: View {
 }
 
 private struct TaskRow: View {
+    @Environment(TaskStore.self) private var store
     let item: TodoItem
     let date: Date
     let onToggle: () -> Void
@@ -202,6 +203,18 @@ private struct TaskRow: View {
                     }
                 }
                 .font(.caption).foregroundStyle(.secondary)
+                if let end = item.endDay?.date(), item.repeatRule == .period {
+                    Text("종료: \(end.formatted(date: .abbreviated, time: .omitted))").font(.caption).foregroundStyle(.secondary)
+                }
+                ForEach(item.subtasks) { subtask in
+                    Toggle(isOn: Binding(get: {
+                        item.repeatRule == .period ? !subtask.completedDays.isEmpty : subtask.completedDays.contains(TaskDay(date))
+                    }, set: { _ in store.toggleSubtask(subtask.id, in: item) })) {
+                        Text(subtask.title).font(.callout)
+                    }
+                    .toggleStyle(.checkbox)
+                    .disabled(!item.occurs(on: date))
+                }
             }
             Spacer(minLength: 8)
             TaskPriorityPicker(title: item.title, priority: Binding(get: { item.priority }, set: onPriority))
