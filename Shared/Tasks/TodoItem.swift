@@ -154,6 +154,11 @@ struct TodoItem: Codable, Identifiable, Equatable, Sendable {
         return repeatRule == .period ? completedDays.contains { $0 <= day } : completedDays.contains(day)
     }
 
+    func isSubtaskCompleted(_ subtask: Subtask, on date: Date, calendar: Calendar = .current) -> Bool {
+        let day = TaskDay(date, calendar: calendar)
+        return repeatRule == .period ? subtask.completedDays.contains { $0 <= day } : subtask.completedDays.contains(day)
+    }
+
     func occurs(on date: Date, calendar: Calendar = .current) -> Bool {
         let day = TaskDay(date, calendar: calendar)
         guard day >= startDay else { return false }

@@ -373,6 +373,8 @@ final class TaskTests: XCTestCase {
         XCTAssertTrue(store.toggleSubtask(child.id, in: task, on: date(22, hour: 5), calendar: calendar))
         XCTAssertEqual(store.items[0].subtasks[0].completedDays, [TaskDay(date(21), calendar: calendar)])
         XCTAssertFalse(store.items[0].isCompleted(on: date(21), calendar: calendar))
+        XCTAssertTrue(store.items[0].isSubtaskCompleted(store.items[0].subtasks[0], on: date(21), calendar: calendar))
+        XCTAssertFalse(store.items[0].isSubtaskCompleted(store.items[0].subtasks[0], on: date(22), calendar: calendar))
         var edited = child
         edited.title = "자료  조사 수정"
         XCTAssertTrue(store.update(task, title: "제목  띄어 쓰기", note: "", repeatRule: .daily, startDate: date(21), priority: .normal, subtasks: [edited], calendar: calendar))
@@ -393,6 +395,8 @@ final class TaskTests: XCTestCase {
         let task = TodoItem(title: "마감 작업", repeatRule: .period, startDate: date(21), endDate: date(23), subtasks: [child], calendar: calendar)
         XCTAssertTrue(store.add(task))
         XCTAssertTrue(store.toggleSubtask(child.id, in: task, on: date(21), calendar: calendar))
+        XCTAssertTrue(store.items[0].isSubtaskCompleted(store.items[0].subtasks[0], on: date(22), calendar: calendar))
+        XCTAssertFalse(store.items[0].isSubtaskCompleted(store.items[0].subtasks[0], on: date(20), calendar: calendar))
         XCTAssertTrue(store.toggleSubtask(child.id, in: task, on: date(22), calendar: calendar))
         XCTAssertTrue(store.items[0].subtasks[0].completedDays.isEmpty)
         XCTAssertFalse(store.toggleSubtask(child.id, in: task, on: date(24), calendar: calendar))

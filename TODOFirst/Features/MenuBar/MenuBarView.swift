@@ -10,7 +10,7 @@ struct MenuBarView: View {
             content(on: TaskClock.dayDate(for: context.date))
         }
         .padding(18)
-        .frame(width: 360)
+        .frame(width: 390)
     }
 
     private func content(on date: Date) -> some View {
@@ -58,6 +58,23 @@ struct MenuBarView: View {
                                         .foregroundStyle(item.isCompleted(on: date) ? .secondary : .primary)
                                         .help(item.title)
                                     Text(item.repeatRule.title).font(.caption2).foregroundStyle(.secondary)
+                                    if !item.subtasks.isEmpty {
+                                        Text("하위 TODO \(item.subtasks.filter { item.isSubtaskCompleted($0, on: date) }.count)/\(item.subtasks.count)")
+                                            .font(.caption2).foregroundStyle(.teal)
+                                        ForEach(item.subtasks) { subtask in
+                                            Toggle(isOn: Binding(
+                                                get: { item.isSubtaskCompleted(subtask, on: date) },
+                                                set: { _ in store.toggleSubtask(subtask.id, in: item) }
+                                            )) {
+                                                Text(subtask.title).font(.callout).fixedSize(horizontal: false, vertical: true)
+                                                    .strikethrough(item.isSubtaskCompleted(subtask, on: date))
+                                                    .foregroundStyle(item.isSubtaskCompleted(subtask, on: date) ? .secondary : .primary)
+                                            }
+                                            .toggleStyle(.checkbox)
+                                            .accessibilityLabel("\(item.title), 하위 할 일 \(subtask.title)")
+                                            .padding(.vertical, 3)
+                                        }
+                                    }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 TaskPriorityPicker(title: item.title, priority: Binding(
@@ -66,12 +83,13 @@ struct MenuBarView: View {
                                 .controlSize(.small)
                             }
                             .disabled(!store.isReady)
-                            Divider()
+                            .padding(12)
+                            .background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
                         }
                     }
                     .padding(.vertical, 2)
                 }
-                .frame(height: min(CGFloat(tasks.count) * 74, 320))
+                .frame(height: min(CGFloat(tasks.reduce(0) { $0 + 88 + $1.subtasks.count * 38 }), 420))
             }
             Text("미완료 · 우선순위 순으로 표시해요")
                 .font(.caption2).foregroundStyle(.secondary)

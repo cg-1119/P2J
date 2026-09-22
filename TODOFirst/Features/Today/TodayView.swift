@@ -208,7 +208,7 @@ private struct TaskRow: View {
                 }
                 ForEach(item.subtasks) { subtask in
                     Toggle(isOn: Binding(get: {
-                        item.repeatRule == .period ? !subtask.completedDays.isEmpty : subtask.completedDays.contains(TaskDay(date))
+                        item.isSubtaskCompleted(subtask, on: date)
                     }, set: { _ in store.toggleSubtask(subtask.id, in: item) })) {
                         Text(subtask.title).font(.callout)
                     }
