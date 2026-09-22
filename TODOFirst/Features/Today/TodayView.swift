@@ -206,6 +206,7 @@ private struct TaskRow: View {
                 if let end = item.endDay?.date(), item.repeatRule == .period {
                     Text("종료: \(end.formatted(date: .abbreviated, time: .omitted))").font(.caption).foregroundStyle(.secondary)
                 }
+                TaskTimingView(item: item, date: date)
                 ForEach(item.subtasks) { subtask in
                     Toggle(isOn: Binding(get: {
                         item.isSubtaskCompleted(subtask, on: date)
@@ -232,5 +233,36 @@ private struct TaskRow: View {
         .padding(16)
         .background(.background, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(.quaternary))
+    }
+}
+
+struct TaskTimingView: View {
+    @Environment(TaskStore.self) private var store
+    let item: TodoItem
+    let date: Date
+
+    var body: some View {
+        let activity = item.activity(on: date)
+        VStack(alignment: .leading, spacing: 5) {
+            if let start = activity?.startedAt {
+                Label("시작 \(start.formatted(date: .abbreviated, time: .shortened))", systemImage: "play.circle")
+            }
+            if let finish = activity?.finishedAt {
+                Label("완료 \(finish.formatted(date: .abbreviated, time: .shortened))", systemImage: "checkmark.circle")
+                if let elapsed = activity?.elapsed {
+                    Text("소요 \(TaskStatistics.durationLabel(elapsed)) · 휴식 포함 경과 시간")
+                }
+            } else if item.isCompleted(on: date) {
+                Text("완료 · 시각 기록 없음")
+            } else if activity?.startedAt != nil {
+                Text("진행 중").foregroundStyle(.teal)
+            }
+            if activity?.startedAt == nil && !item.isCompleted(on: date) && item.occurs(on: date) {
+                Button { store.start(item) } label: { Label("시작", systemImage: "play.fill") }
+                    .buttonStyle(.borderless).foregroundStyle(.teal)
+                    .accessibilityLabel("\(item.title) 시작")
+            }
+        }
+        .font(.caption).foregroundStyle(.secondary)
     }
 }

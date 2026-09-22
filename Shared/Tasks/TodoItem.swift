@@ -91,6 +91,17 @@ struct Subtask: Codable, Identifiable, Equatable, Sendable {
     var completedDays: Set<TaskDay> = []
 }
 
+struct TaskActivity: Codable, Equatable, Identifiable, Sendable {
+    var id: UUID = UUID()
+    var day: TaskDay
+    var startedAt: Date?
+    var finishedAt: Date?
+    var elapsed: TimeInterval? {
+        guard let startedAt, let finishedAt, finishedAt >= startedAt else { return nil }
+        return finishedAt.timeIntervalSince(startedAt)
+    }
+}
+
 struct TodoItem: Codable, Identifiable, Equatable, Sendable {
     let id: UUID
     var title: String
@@ -103,6 +114,7 @@ struct TodoItem: Codable, Identifiable, Equatable, Sendable {
     let createdAt: Date
     var completedDays: Set<TaskDay> = []
     var archivedOn: TaskDay?
+    var activities: [TaskActivity] = []
 
     init(id: UUID = UUID(), title: String, note: String = "", repeatRule: TaskRepeat = .once,
          startDate: Date = .now, createdAt: Date = .now, priority: TaskPriority = .normal, endDate: Date? = nil, subtasks: [Subtask] = [], calendar: Calendar = .current) {
@@ -118,7 +130,7 @@ struct TodoItem: Codable, Identifiable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, note, repeatRule, startDay, createdAt, completedDays, archivedOn, priority, endDay, subtasks
+        case id, title, note, repeatRule, startDay, createdAt, completedDays, archivedOn, priority, endDay, subtasks, activities
     }
 
     // v1 파일에 없던 완료 기록은 빈 목록으로 읽습니다.
@@ -134,6 +146,7 @@ struct TodoItem: Codable, Identifiable, Equatable, Sendable {
         completedDays = try values.decodeIfPresent(Set<TaskDay>.self, forKey: .completedDays) ?? []
         endDay = try values.decodeIfPresent(TaskDay.self, forKey: .endDay)
         subtasks = try values.decodeIfPresent([Subtask].self, forKey: .subtasks) ?? []
+        activities = try values.decodeIfPresent([TaskActivity].self, forKey: .activities) ?? []
         archivedOn = try values.decodeIfPresent(TaskDay.self, forKey: .archivedOn)
     }
 
@@ -147,6 +160,11 @@ struct TodoItem: Codable, Identifiable, Equatable, Sendable {
             if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
             return lhs.id.uuidString < rhs.id.uuidString
         }
+    }
+
+    func activity(on date: Date, calendar: Calendar = .current) -> TaskActivity? {
+        if repeatRule == .period { return activities.last }
+        return activities.last { $0.day == TaskDay(date, calendar: calendar) }
     }
 
     func isCompleted(on date: Date, calendar: Calendar = .current) -> Bool {

@@ -33,7 +33,7 @@ struct TaskRepository {
             return []
         }
         let document = try JSONDecoder().decode(Document.self, from: data)
-        guard (1...4).contains(document.version) else { throw StorageError.unsupportedVersion }
+        guard (1...5).contains(document.version) else { throw StorageError.unsupportedVersion }
         try validate(document.items)
         return document.items
     }
@@ -42,7 +42,7 @@ struct TaskRepository {
         try validate(items)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(Document(version: 4, items: items))
+        let data = try encoder.encode(Document(version: 5, items: items))
         try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: fileURL, options: .atomic)
     }

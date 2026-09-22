@@ -32,3 +32,53 @@ enum TaskStatistics {
         }
     }
 }
+
+struct TaskLogEntry: Identifiable {
+    var id: String { "\(taskID)-\(day.year)-\(day.month)-\(day.day)" }
+    let taskID: UUID
+    let title: String
+    let priority: TaskPriority
+    let day: TaskDay
+    let startedAt: Date?
+    let finishedAt: Date?
+    let completed: Bool
+    var elapsed: TimeInterval? {
+        guard let startedAt, let finishedAt, finishedAt >= startedAt else { return nil }
+        return finishedAt.timeIntervalSince(startedAt)
+    }
+}
+
+extension TaskStatistics {
+    static func logs(_ count: Int, through date: Date, records: [TodoItem], calendar: Calendar = .current) -> [TaskLogEntry] {
+        guard count > 0, let first = calendar.date(byAdding: .day, value: 1 - count, to: date) else { return [] }
+        let lower = TaskDay(first, calendar: calendar), upper = TaskDay(date, calendar: calendar)
+        var result: [TaskLogEntry] = []
+        for item in records {
+            var rows: [TaskDay: TaskLogEntry] = [:]
+            for day in item.completedDays {
+                rows[day] = TaskLogEntry(taskID: item.id, title: item.title, priority: item.priority,
+                                        day: day, startedAt: nil, finishedAt: nil, completed: true)
+            }
+            for activity in item.activities {
+                let day = activity.finishedAt.map { TaskDay(TaskClock.dayDate(for: $0, calendar: calendar), calendar: calendar) } ?? activity.day
+                rows[day] = TaskLogEntry(taskID: item.id, title: item.title, priority: item.priority,
+                                        day: day, startedAt: activity.startedAt, finishedAt: activity.finishedAt,
+                                        completed: item.completedDays.contains(day))
+            }
+            result += rows.values.filter { $0.day >= lower && $0.day <= upper }
+        }
+        return result.sorted {
+            if $0.day != $1.day { return $0.day > $1.day }
+            let left = $0.finishedAt ?? $0.startedAt ?? .distantPast
+            let right = $1.finishedAt ?? $1.startedAt ?? .distantPast
+            return left != right ? left > right : $0.id < $1.id
+        }
+    }
+
+    static func durationLabel(_ seconds: TimeInterval) -> String {
+        let minutes = Int(max(0, seconds) / 60)
+        if minutes == 0 { return "1분 미만" }
+        if minutes < 60 { return "\(minutes)분" }
+        return "\(minutes / 60)시간 \(minutes % 60)분"
+    }
+}

@@ -48,24 +48,46 @@ final class TaskStore {
     }
 
     @discardableResult
-    func toggleCompletion(_ item: TodoItem, on date: Date = .now, calendar: Calendar = .current) -> Bool {
-        let date = TaskClock.dayDate(for: date, calendar: calendar)
+    func toggleCompletion(_ item: TodoItem, on instant: Date = .now, calendar: Calendar = .current) -> Bool {
+        let date = TaskClock.dayDate(for: instant, calendar: calendar)
         guard let index = records.firstIndex(where: { $0.id == item.id }),
               records[index].archivedOn == nil,
               records[index].occurs(on: date, calendar: calendar) else { return false }
         var next = records
         let day = TaskDay(date, calendar: calendar)
+        let undo = next[index].isCompleted(on: date, calendar: calendar)
         if next[index].repeatRule == .period {
-            if next[index].isCompleted(on: date, calendar: calendar) {
-                next[index].completedDays.removeAll()
-            } else { next[index].completedDays = [day] }
-            return persist(next)
+            if undo { next[index].completedDays.removeAll() }
+            else { next[index].completedDays = [day] }
+        } else if undo { next[index].completedDays.remove(day) }
+        else { next[index].completedDays.insert(day) }
+        let activityIndex = next[index].repeatRule == .period
+            ? next[index].activities.indices.last
+            : next[index].activities.lastIndex { $0.day == day }
+        if let activityIndex {
+            next[index].activities[activityIndex].finishedAt = undo ? nil : instant
+            if undo && next[index].activities[activityIndex].startedAt == nil {
+                next[index].activities.remove(at: activityIndex)
+            }
+        } else if !undo {
+            next[index].activities.append(TaskActivity(day: day, finishedAt: instant))
         }
-        if next[index].completedDays.contains(day) {
-            next[index].completedDays.remove(day)
-        } else {
-            next[index].completedDays.insert(day)
-        }
+        return persist(next)
+    }
+
+    @discardableResult
+    func start(_ item: TodoItem, on instant: Date = .now, calendar: Calendar = .current) -> Bool {
+        let date = TaskClock.dayDate(for: instant, calendar: calendar)
+        guard let index = records.firstIndex(where: { $0.id == item.id && $0.archivedOn == nil }),
+              records[index].occurs(on: date, calendar: calendar),
+              !records[index].isCompleted(on: date, calendar: calendar),
+              records[index].activity(on: date, calendar: calendar)?.startedAt == nil else { return false }
+        var next = records
+        let day = TaskDay(date, calendar: calendar)
+        let activityIndex = next[index].repeatRule == .period ? next[index].activities.indices.last
+            : next[index].activities.lastIndex { $0.day == day }
+        if let activityIndex { next[index].activities[activityIndex].startedAt = instant }
+        else { next[index].activities.append(TaskActivity(day: day, startedAt: instant)) }
         return persist(next)
     }
 

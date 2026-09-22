@@ -58,6 +58,7 @@ struct MenuBarView: View {
                                         .foregroundStyle(item.isCompleted(on: date) ? .secondary : .primary)
                                         .help(item.title)
                                     Text(item.repeatRule.title).font(.caption2).foregroundStyle(.secondary)
+                                    TaskTimingView(item: item, date: date)
                                     if !item.subtasks.isEmpty {
                                         Text("하위 TODO \(item.subtasks.filter { item.isSubtaskCompleted($0, on: date) }.count)/\(item.subtasks.count)")
                                             .font(.caption2).foregroundStyle(.teal)

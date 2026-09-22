@@ -431,4 +431,87 @@ final class TaskTests: XCTestCase {
         XCTAssertThrowsError(try repo.save([invalid]))
     }
 
+    @MainActor func testTimingTracksExactInstantsAcrossSixAMAndUndo() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let store = TaskStore(repository: repo)
+        let task = item(.daily)
+        XCTAssertTrue(store.add(task))
+        let start = date(22, hour: 1), finish = date(22, hour: 2)
+        XCTAssertTrue(store.start(task, on: start, calendar: calendar))
+        XCTAssertFalse(store.start(task, on: finish, calendar: calendar))
+        XCTAssertTrue(store.toggleCompletion(task, on: finish, calendar: calendar))
+        let activity = try XCTUnwrap(store.items[0].activity(on: date(21), calendar: calendar))
+        XCTAssertEqual(activity.startedAt, start)
+        XCTAssertEqual(activity.finishedAt, finish)
+        XCTAssertEqual(activity.elapsed, 3600)
+        XCTAssertEqual(try repo.load()[0].activities, [activity])
+        let logs = TaskStatistics.logs(1, through: date(21), records: store.records, calendar: calendar)
+        XCTAssertEqual(logs.count, 1)
+        XCTAssertEqual(logs[0].elapsed, 3600)
+        XCTAssertTrue(logs[0].completed)
+        XCTAssertTrue(store.toggleCompletion(task, on: finish.addingTimeInterval(60), calendar: calendar))
+        XCTAssertNil(store.items[0].activities[0].finishedAt)
+        XCTAssertEqual(store.items[0].activities[0].startedAt, start)
+        XCTAssertTrue(store.start(task, on: date(22, hour: 6), calendar: calendar))
+        XCTAssertEqual(store.items[0].activities.count, 2)
+    }
+
+    @MainActor func testPeriodTimingSpansDaysAndCompletionWithoutStartIsUnknown() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let store = TaskStore(repository: repo)
+        let task = TodoItem(title: "기간", repeatRule: .period, startDate: date(21), endDate: date(25), calendar: calendar)
+        XCTAssertTrue(store.add(task))
+        XCTAssertTrue(store.start(task, on: date(21, hour: 10), calendar: calendar))
+        XCTAssertFalse(store.start(task, on: date(22), calendar: calendar))
+        XCTAssertTrue(store.toggleCompletion(task, on: date(23, hour: 11), calendar: calendar))
+        let logs = TaskStatistics.logs(1, through: date(23), records: store.records, calendar: calendar)
+        XCTAssertEqual(logs.count, 1)
+        XCTAssertEqual(logs[0].elapsed, 49 * 3600)
+        XCTAssertTrue(TaskStatistics.logs(1, through: date(22), records: store.records, calendar: calendar).isEmpty)
+        let direct = item(.once)
+        XCTAssertTrue(store.add(direct))
+        XCTAssertTrue(store.toggleCompletion(direct, on: date(21), calendar: calendar))
+        let entry = try XCTUnwrap(TaskStatistics.logs(1, through: date(21), records: store.records, calendar: calendar).first)
+        XCTAssertNil(entry.startedAt)
+        XCTAssertNotNil(entry.finishedAt)
+        XCTAssertNil(entry.elapsed)
+        XCTAssertTrue(store.toggleCompletion(direct, on: date(21), calendar: calendar))
+        XCTAssertTrue(TaskStatistics.logs(1, through: date(21), records: store.records, calendar: calendar).isEmpty)
+    }
+
+    @MainActor func testTimingSurvivesEditingAndFailedWritesDoNotPublish() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let store = TaskStore(repository: repo)
+        let task = item(.daily)
+        XCTAssertTrue(store.add(task))
+        XCTAssertTrue(store.start(task, on: date(21), calendar: calendar))
+        XCTAssertTrue(store.update(task, title: "수정", note: "", repeatRule: .daily, startDate: date(21), priority: .high, calendar: calendar))
+        XCTAssertEqual(store.items[0].activities[0].startedAt, date(21))
+        let before = store.records
+        try FileManager.default.removeItem(at: repo.fileURL)
+        try FileManager.default.createDirectory(at: repo.fileURL, withIntermediateDirectories: true)
+        XCTAssertFalse(store.toggleCompletion(task, on: date(21, hour: 13), calendar: calendar))
+        XCTAssertFalse(store.start(task, on: date(22), calendar: calendar))
+        XCTAssertEqual(store.records, before)
+    }
+
+    func testLegacyTimingIsNotInventedAndArchivedCompletionStillAppears() throws {
+        var old = item(.once)
+        old.completedDays = [TaskDay(date(21), calendar: calendar)]
+        old.archivedOn = TaskDay(date(22), calendar: calendar)
+        var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(old)) as! [String: Any]
+        json.removeValue(forKey: "activities")
+        let restored = try JSONDecoder().decode(TodoItem.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertTrue(restored.activities.isEmpty)
+        let logs = TaskStatistics.logs(7, through: date(23), records: [restored], calendar: calendar)
+        XCTAssertEqual(logs.count, 1)
+        XCTAssertTrue(logs[0].completed)
+        XCTAssertNil(logs[0].startedAt)
+        XCTAssertNil(logs[0].finishedAt)
+        XCTAssertTrue(TaskStatistics.logs(0, through: date(23), records: [restored], calendar: calendar).isEmpty)
+    }
+
 }
