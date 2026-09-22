@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct NewTaskView: View {
     @Environment(TaskStore.self) private var store
@@ -37,7 +38,7 @@ struct NewTaskView: View {
 
             Form {
                 Section("무엇을 할까요?") {
-                    TextField("할 일 제목", text: $title, prompt: Text("예: 책 10쪽 읽기"))
+                    LiveTitleField(text: $title)
                         .focused($titleFocused)
                         .accessibilityIdentifier("taskTitle")
                     TextField("메모 (선택)", text: $note, axis: .vertical)
@@ -99,6 +100,7 @@ struct NewTaskView: View {
                 Button("취소") { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button(editingItem == nil ? "등록" : "저장") {
+                    NSApp.keyWindow?.makeFirstResponder(nil)
                     let saved: Bool
                     if let editingItem {
                         saved = store.update(editingItem, title: title, note: note, repeatRule: repeatRule,
@@ -118,5 +120,32 @@ struct NewTaskView: View {
         }
         .frame(width: 520, height: editingItem == nil ? 550 : 640)
         .onAppear { titleFocused = true }
+    }
+}
+
+/// 편집 중 공백·한글 조합을 매번 전달하고 활성 편집기의 문자열을 덮어쓰지 않습니다.
+private struct LiveTitleField: NSViewRepresentable {
+    @Binding var text: String
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    func makeNSView(context: Context) -> NSTextField {
+        let field = NSTextField()
+        field.placeholderString = "할 일 제목"
+        field.delegate = context.coordinator
+        field.isContinuous = true
+        field.setAccessibilityLabel("할 일 제목")
+        return field
+    }
+    func updateNSView(_ field: NSTextField, context: Context) {
+        context.coordinator.parent = self
+        if field.currentEditor() == nil && field.stringValue != text { field.stringValue = text }
+    }
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: LiveTitleField
+        init(_ parent: LiveTitleField) { self.parent = parent }
+        func controlTextDidChange(_ notification: Notification) {
+            guard let field = notification.object as? NSTextField else { return }
+            parent.text = field.stringValue
+        }
+        func controlTextDidEndEditing(_ notification: Notification) { controlTextDidChange(notification) }
     }
 }
