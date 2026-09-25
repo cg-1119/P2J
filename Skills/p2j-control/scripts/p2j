@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""P2J 로컬 JSON API 클라이언트. 저장 파일은 직접 수정하지 않습니다."""
+import argparse
+import base64
+import json
+import pathlib
+import subprocess
+import sys
+import time
+import urllib.parse
+import uuid
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('operation', choices=['list', 'stats', 'add', 'update', 'start', 'complete', 'subtask', 'timing'])
+    parser.add_argument('--json', help='요청 필드 JSON. 생략하면 빈 객체, - 이면 stdin에서 읽음')
+    parser.add_argument('--app', help='실행할 P2J.app 경로. 생략하면 설치된 P2J URL 핸들러 사용')
+    parser.add_argument('--request-id', help='재시도 시 기존 UUID 재사용')
+    parser.add_argument('--response-dir', type=pathlib.Path, help='앱의 automation 응답 폴더를 명시')
+    parser.add_argument('--dry-run', action='store_true', help='앱에 전송하지 않고 요청만 출력')
+    args = parser.parse_args()
+    fields = json.loads(sys.stdin.read() if args.json == '-' else args.json or '{}')
+    if not isinstance(fields, dict):
+        raise ValueError('요청은 JSON 객체여야 합니다.')
+    request_id = str(uuid.UUID(args.request_id)) if args.request_id else str(uuid.uuid4())
+    fields.update(id=request_id, operation=args.operation)
+    data = json.dumps(fields, ensure_ascii=False).encode()
+    if len(data) > 60000:
+        raise ValueError('요청은 60KB 이하여야 합니다.')
+    if args.dry_run:
+        print(data.decode())
+        return 0
+    roots = [args.response_dir] if args.response_dir else [
+        pathlib.Path.home() / 'Library/Application Support/TODOFirst/automation',
+        pathlib.Path.home() / 'Library/Containers/com.cg1119.todofirst.TODOFirst/Data/Library/Application Support/TODOFirst/automation',
+    ]
+    files = [root / (request_id + '.json') for root in roots]
+    tokens = [root.parent / 'automation-token' for root in roots]
+    found_tokens = [file for file in tokens if file.exists()]
+    if len(found_tokens) > 1:
+        raise ValueError('여러 앱 저장소가 있습니다. 실행할 앱의 automation 폴더를 --response-dir로 지정해주세요.')
+    token_file = next(iter(found_tokens), None)
+    if token_file is None:
+        raise ValueError('최신 P2J 앱을 먼저 실행해주세요. 자동화 토큰이 아직 없습니다.')
+    fields['token'] = token_file.read_text()
+    data = json.dumps(fields, ensure_ascii=False).encode()
+    url = 'p2j://automation?' + urllib.parse.urlencode({'request': base64.b64encode(data).decode()})
+    if not any(file.exists() for file in files):
+        command = ['open', '-g']
+        if args.app:
+            command += ['-a', args.app]
+        subprocess.run(command + [url], check=True, capture_output=True)
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        for file in files:
+            if file.exists():
+                reply = json.loads(file.read_text())
+                if reply.get('id') != request_id:
+                    raise ValueError('응답 ID가 다릅니다.')
+                print(json.dumps(reply, ensure_ascii=False))
+                return 0 if reply.get('ok') else 1
+        time.sleep(0.1)
+    print(json.dumps({'ok': False, 'id': request_id, 'error': '응답 시간 초과. 최신 앱 실행·응답 경로를 확인하고 동일 --request-id로 재조회하세요.'}, ensure_ascii=False))
+    return 1
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except (ValueError, OSError, subprocess.SubprocessError) as error:
+        print(json.dumps({'ok': False, 'error': str(error)}, ensure_ascii=False))
+        sys.exit(1)

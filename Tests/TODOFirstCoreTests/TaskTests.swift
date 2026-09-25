@@ -553,5 +553,30 @@ final class TaskTests: XCTestCase {
         XCTAssertEqual(try repo.load(), store.records)
     }
 
+    @MainActor func testAutomationIsIdempotentAndPreservesExistingFields() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let store = TaskStore(repository: repo)
+        let add = TaskAutomationRequest(id: UUID(), operation: "add", title: "AI로 등록", note: "유지", rule: .daily, subtasks: ["하위"])
+        _ = try TaskAutomation.execute(add, store: store)
+        _ = try TaskAutomation.execute(add, store: store)
+        XCTAssertEqual(store.items.count, 1)
+        let update = TaskAutomationRequest(id: UUID(), operation: "update", taskID: add.id, title: "변경")
+        _ = try TaskAutomation.execute(update, store: store)
+        XCTAssertEqual(store.items[0].note, "유지")
+        XCTAssertEqual(store.items[0].subtasks.count, 1)
+        let done = TaskAutomationRequest(id: UUID(), operation: "complete", taskID: add.id, completed: true)
+        _ = try TaskAutomation.execute(done, store: store)
+        let finished = store.items[0].activities[0].finishedAt
+        _ = try TaskAutomation.execute(done, store: store)
+        XCTAssertEqual(store.items[0].activities[0].finishedAt, finished)
+        let stats = try TaskAutomation.execute(TaskAutomationRequest(id: UUID(), operation: "stats", days: 7), store: store)
+        let object = try JSONSerialization.jsonObject(with: stats) as! [String: Any]
+        XCTAssertEqual(object["recurringCompleted"] as? Int, 1)
+        XCTAssertThrowsError(try TaskAutomation.execute(TaskAutomationRequest(id: UUID(), operation: "stats", days: 0), store: store))
+        XCTAssertThrowsError(try TaskAutomation.execute(TaskAutomationRequest(id: UUID(), operation: "add", title: "잘못된 날짜", startDate: "2026-02-30"), store: store))
+        XCTAssertThrowsError(try TaskAutomation.execute(TaskAutomationRequest(id: UUID(), operation: "complete", taskID: UUID(), completed: true), store: store))
+        XCTAssertEqual(store.items.count, 1)
+    }
 
 }

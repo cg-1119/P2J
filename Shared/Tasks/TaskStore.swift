@@ -188,3 +188,153 @@ final class TaskStore {
     }
 }
 
+/// 로컬 자동화 요청도 앱의 TaskStore를 거쳐 저장합니다.
+struct TaskAutomationRequest: Codable {
+    let id: UUID
+    let operation: String
+    var token: String?
+    var taskID: UUID?
+    var title: String?
+    var note: String?
+    var rule: TaskRepeat?
+    var startDate: String?
+    var endDate: String?
+    var priority: TaskPriority?
+    var subtasks: [String]?
+    var subtaskID: UUID?
+    var completed: Bool?
+    var workday: String?
+    var startedAt: String?
+    var finishedAt: String?
+    var days: Int?
+}
+
+enum TaskAutomation {
+    struct Failure: LocalizedError {
+        let message: String
+        var errorDescription: String? { message }
+    }
+
+    @MainActor static func execute(_ request: TaskAutomationRequest, store: TaskStore, now: Date = .now) throws -> Data {
+        guard store.isReady else { throw Failure(message: store.errorMessage ?? "저장소 준비 실패") }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        func date(_ value: String?, fallback: Date) throws -> Date {
+            guard let value else { return fallback }
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.timeZone = .current
+            formatter.dateFormat = "yyyy-MM-dd"
+            formatter.isLenient = false
+            guard let parsed = formatter.date(from: value), formatter.string(from: parsed) == value else {
+                throw Failure(message: "날짜는 YYYY-MM-DD 형식이어야 합니다.")
+            }
+            return Calendar.current.date(bySettingHour: 12, minute: 0, second: 0, of: parsed)!
+        }
+        func instant(_ value: String?) throws -> Date? {
+            guard let value else { return nil }
+            guard let parsed = ISO8601DateFormatter().date(from: value) else {
+                throw Failure(message: "시각은 시간대가 포함된 ISO 8601 형식이어야 합니다.")
+            }
+            return parsed
+        }
+        func check(_ result: Bool) throws {
+            if !result { throw Failure(message: store.errorMessage ?? "현재 일정에서 처리할 수 없는 요청입니다.") }
+        }
+        if request.operation == "list" { return try encoder.encode(store.items) }
+        if request.operation == "stats" {
+            let days = request.days ?? 7
+            guard (1...366).contains(days) else { throw Failure(message: "days는 1~366입니다.") }
+            let counts = TaskStatistics.summary(days, through: TaskClock.dayDate(for: now), records: store.records)
+            let data = try encoder.encode(counts)
+            var output = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+            output["total"] = counts.total; output["completed"] = counts.completed
+            let logs = TaskStatistics.logs(days, through: TaskClock.dayDate(for: now), records: store.records)
+            output["logs"] = try JSONSerialization.jsonObject(with: encoder.encode(logs))
+            let elapsed = logs.filter(\.completed).compactMap(\.elapsed)
+            output["timedCompletions"] = elapsed.count
+            output["recordedElapsedSeconds"] = elapsed.reduce(0, +)
+            if !elapsed.isEmpty { output["averageElapsedSeconds"] = elapsed.reduce(0, +) / Double(elapsed.count) }
+            return try JSONSerialization.data(withJSONObject: output, options: [.sortedKeys])
+        }
+        if request.operation == "add" {
+            if let existing = store.records.first(where: { $0.id == request.id }) { return try encoder.encode(existing) }
+            guard let title = request.title else { throw Failure(message: "title이 필요합니다.") }
+            guard request.rule != .weekdays else { throw Failure(message: "평일 반복은 신규 등록할 수 없습니다.") }
+            let start = try date(request.startDate, fallback: TaskClock.dayDate(for: now))
+            let end = try request.endDate.map { try date($0, fallback: start) }
+            let item = TodoItem(id: request.id, title: title, note: request.note ?? "", repeatRule: request.rule ?? .once,
+                                startDate: start, priority: request.priority ?? .normal, endDate: end,
+                                subtasks: (request.subtasks ?? []).map { Subtask(title: $0) })
+            try check(store.add(item))
+            return try encoder.encode(item)
+        }
+        guard let taskID = request.taskID, let item = store.items.first(where: { $0.id == taskID }) else {
+            throw Failure(message: "list에서 확인한 taskID가 필요합니다.")
+        }
+        switch request.operation {
+        case "start":
+            let today = TaskClock.dayDate(for: now)
+            if item.activity(on: today)?.startedAt == nil { try check(store.start(item, on: now)) }
+        case "complete":
+            guard let completed = request.completed else { throw Failure(message: "completed가 필요합니다.") }
+            if item.isCompleted(on: TaskClock.dayDate(for: now)) != completed { try check(store.toggleCompletion(item, on: now)) }
+        case "subtask":
+            guard let id = request.subtaskID, let child = item.subtasks.first(where: { $0.id == id }),
+                  let completed = request.completed else { throw Failure(message: "subtaskID와 completed가 필요합니다.") }
+            if item.isSubtaskCompleted(child, on: TaskClock.dayDate(for: now)) != completed {
+                try check(store.toggleSubtask(id, in: item, on: now))
+            }
+        case "update":
+            guard request.rule != .weekdays else { throw Failure(message: "평일 반복으로 변경할 수 없습니다.") }
+            try check(store.update(item, title: request.title ?? item.title, note: request.note ?? item.note,
+                                   repeatRule: request.rule ?? item.repeatRule,
+                                   startDate: date(request.startDate, fallback: item.startDay.date()!), priority: request.priority ?? item.priority,
+                                   endDate: date(request.endDate, fallback: item.endDay?.date() ?? item.startDay.date()!),
+                                   subtasks: nil))
+        case "timing":
+            try check(store.recordTiming(item, workday: date(request.workday, fallback: TaskClock.dayDate(for: now)),
+                                         startedAt: instant(request.startedAt), finishedAt: instant(request.finishedAt), now: now))
+        default: throw Failure(message: "지원하지 않는 operation입니다.")
+        }
+        return try encoder.encode(store.items.first { $0.id == taskID }!)
+    }
+
+    static func prepare() throws {
+        let base = try TaskRepository.local().fileURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        let tokenFile = base.appendingPathComponent("automation-token")
+        if !FileManager.default.fileExists(atPath: tokenFile.path) {
+            try Data((UUID().uuidString + UUID().uuidString).utf8).write(to: tokenFile, options: .atomic)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: tokenFile.path)
+        }
+    }
+
+    @MainActor static func handle(_ url: URL, store: TaskStore) {
+        guard url.scheme == "p2j", url.host == "automation",
+              let encoded = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "request" })?.value,
+              encoded.count < 100_000, let data = Data(base64Encoded: encoded),
+              let request = try? JSONDecoder().decode(TaskAutomationRequest.self, from: data) else { return }
+        do {
+            let base = try TaskRepository.local().fileURL.deletingLastPathComponent()
+            let token = try String(contentsOf: base.appendingPathComponent("automation-token"), encoding: .utf8)
+            guard request.token == token else { return }
+            let directory = base.appendingPathComponent("automation")
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+            let file = directory.appendingPathComponent(request.id.uuidString.lowercased() + ".json")
+            // 동일 요청 ID는 재실행하지 않습니다. 클라이언트는 같은 ID의 응답을 다시 읽습니다.
+            if FileManager.default.fileExists(atPath: file.path) { return }
+            let response: [String: Any]
+            do {
+                let result = try execute(request, store: store)
+                response = ["id": request.id.uuidString.lowercased(), "ok": true,
+                            "data": try JSONSerialization.jsonObject(with: result)]
+            } catch {
+                response = ["id": request.id.uuidString.lowercased(), "ok": false, "error": error.localizedDescription]
+            }
+            try JSONSerialization.data(withJSONObject: response, options: [.sortedKeys]).write(to: file, options: .atomic)
+        } catch { /* 응답 파일 쓰기 실패는 클라이언트에서 시간 초과로 보고합니다. */ }
+    }
+}

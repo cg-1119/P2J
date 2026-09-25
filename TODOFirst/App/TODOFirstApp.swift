@@ -8,6 +8,7 @@ struct TODOFirstApp: App {
     @Environment(\.openWindow) private var openWindow
 
     init() {
+        try? TaskAutomation.prepare()
         let sync = WidgetSync()
         _widgetSync = State(initialValue: sync)
         _taskStore = State(initialValue: TaskStore(didChange: { sync.publish($0) }))
@@ -18,6 +19,10 @@ struct TODOFirstApp: App {
             TodayView()
                 .environment(taskStore)
                 .onOpenURL { url in
+                    if url.scheme == "p2j", url.host == "automation" {
+                        TaskAutomation.handle(url, store: taskStore)
+                        return
+                    }
                     guard url.scheme == "p2j", url.host == "today" else { return }
                     openWindow(id: "main")
                     NSApplication.shared.activate(ignoringOtherApps: true)
