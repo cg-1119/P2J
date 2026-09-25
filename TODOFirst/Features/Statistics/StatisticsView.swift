@@ -10,13 +10,14 @@ struct StatisticsView: View {
     var body: some View {
         let model = WidgetDayModel(date: date, records: records)
         let today = DayStatistics(date: date, total: model.total, completed: model.completed)
-        let history = TaskStatistics.recent(days, through: date, records: records)
-        let total = history.reduce(0) { $0 + $1.total }
-        let completed = history.reduce(0) { $0 + $1.completed }
+        let history = TaskStatistics.recent(days, through: date, records: records.filter { $0.repeatRule != .period })
+        let counts = TaskStatistics.summary(days, through: date, records: records)
+        let total = counts.total
+        let completed = counts.completed
         let logs = TaskStatistics.logs(days, through: date, records: records)
         let measured = logs.filter(\.completed).compactMap(\.elapsed)
         let previousEnd = Calendar.current.date(byAdding: .day, value: -days, to: date)!
-        let previous = TaskStatistics.recent(days, through: previousEnd, records: records).reduce(0) { $0 + $1.completed }
+        let previous = TaskStatistics.summary(days, through: previousEnd, records: records).completed
         let difference = completed - previous
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
@@ -53,7 +54,18 @@ struct StatisticsView: View {
                 }
 
                 HStack(spacing: 16) {
-                    metric("완료한 날", value: "\(history.filter { $0.completed > 0 }.count) / \(days)일")
+                    metric("하루 작업", value: "\(counts.onceCompleted) / \(counts.onceTotal)건")
+                    metric("반복 수행", value: "\(counts.recurringCompleted) / \(counts.recurringTotal)회")
+                    metric("기간 작업", value: "\(counts.periodCompleted) / \(counts.periodTotal)건")
+                }
+                Text("기간 작업은 조회 기간과 겹치는 작업을 한 번만, 매일·매주 작업은 예정된 날짜마다 한 회로 계산합니다. 합계는 작업 건수와 반복 수행 횟수를 합친 값입니다.")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 16) {
+                    metric("기록된 총 소요", value: measured.isEmpty ? "기록 없음" : TaskStatistics.durationLabel(measured.reduce(0, +)))
+                    metric("시간 기록 완료", value: "\(measured.count)건")
+                }
+                HStack(spacing: 16) {
+                    metric("완료한 날", value: "\(Set(logs.filter(\.completed).map(\.day)).count) / \(days)일")
                     metric("평균 소요", value: measured.isEmpty ? "기록 없음" : TaskStatistics.durationLabel(measured.reduce(0, +) / Double(measured.count)))
                     metric("이전 \(days)일 대비", value: "\(difference > 0 ? "+" : "")\(difference)개")
                 }
@@ -65,6 +77,7 @@ struct StatisticsView: View {
                         .foregroundStyle(.secondary).padding(.vertical, 12)
                 }
 
+                Text("일별 수행 · 하루 작업과 반복 일정").font(.headline)
                 Chart(history) { day in
                     BarMark(x: .value("날짜", day.date, unit: .day), y: .value("할 일 수", day.completed))
                         .foregroundStyle(by: .value("상태", "완료"))
@@ -84,9 +97,9 @@ struct StatisticsView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Label("우선순위별 성과", systemImage: "flag").font(.headline)
                     ForEach(TaskPriority.allCases) { priority in
-                        let group = TaskStatistics.recent(days, through: date, records: records.filter { $0.priority == priority })
-                        let planned = group.reduce(0) { $0 + $1.total }
-                        let done = group.reduce(0) { $0 + $1.completed }
+                        let group = TaskStatistics.summary(days, through: date, records: records.filter { $0.priority == priority })
+                        let planned = group.total
+                        let done = group.completed
                         HStack {
                             Text(priority.title).frame(width: 40, alignment: .leading)
                             ProgressView(value: Double(done), total: Double(max(planned, 1))).tint(.teal)
@@ -146,7 +159,7 @@ struct StatisticsView: View {
                     .font(.callout)
                     Divider()
                 }
-                Text("오늘을 포함한 기간입니다. 하루에 할 일 하나를 1건으로 계산하며, 삭제 전 일정과 완료 기록도 포함합니다. 시작일을 과거로 등록하면 해당 기간의 계획 수에도 반영됩니다.")
+                Text("오늘을 포함한 기간입니다. 일별 차트와 일별 기록은 하루 작업·반복 수행 기준이며 기간 작업은 위의 별도 집계에 포함합니다. 삭제 전 일정과 완료 기록도 포함합니다. 시작일을 과거로 등록하면 해당 기간의 계획 수에도 반영됩니다.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             .padding(.vertical, 2)

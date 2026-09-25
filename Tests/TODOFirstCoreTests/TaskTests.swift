@@ -514,6 +514,26 @@ final class TaskTests: XCTestCase {
         XCTAssertTrue(TaskStatistics.logs(0, through: date(23), records: [restored], calendar: calendar).isEmpty)
     }
 
+    func testSummaryCountsPeriodOnceAndDailyPerOccurrence() {
+        var period = TodoItem(title: "기간", repeatRule: .period, startDate: date(21), endDate: date(30), calendar: calendar)
+        var daily = item(.daily)
+        daily.completedDays = [TaskDay(date(21), calendar: calendar), TaskDay(date(22), calendar: calendar)]
+        period.completedDays = [TaskDay(date(23), calendar: calendar)]
+        let summary = TaskStatistics.summary(7, through: date(27), records: [period, daily], calendar: calendar)
+        XCTAssertEqual(summary.periodTotal, 1)
+        XCTAssertEqual(summary.periodCompleted, 1)
+        XCTAssertEqual(summary.recurringTotal, 7)
+        XCTAssertEqual(summary.recurringCompleted, 2)
+        XCTAssertEqual(summary.total, 8)
+        XCTAssertEqual(summary.completed, 3)
+        XCTAssertEqual(TaskStatistics.summary(1, through: date(24), records: [period], calendar: calendar).periodTotal, 0)
+        period.completedDays = []
+        XCTAssertEqual(TaskStatistics.summary(7, through: date(27), records: [period], calendar: calendar).periodTotal, 1)
+        XCTAssertEqual(TaskStatistics.summary(1, through: date(20), records: [period], calendar: calendar).periodTotal, 0)
+        period.archivedOn = TaskDay(date(22), calendar: calendar)
+        XCTAssertEqual(TaskStatistics.summary(1, through: date(23), records: [period], calendar: calendar).periodTotal, 0)
+    }
+
     @MainActor func testManualTimingValidatesAndUpdatesCompletion() throws {
         let repo = repository()
         defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
