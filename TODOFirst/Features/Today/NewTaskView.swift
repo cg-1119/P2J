@@ -177,7 +177,7 @@ struct NewTaskView: View {
     }
 }
 
-private struct TaskDateButton: View {
+struct TaskDateButton: View {
     let label: String
     @Binding var date: Date
     @State private var showingCalendar = false

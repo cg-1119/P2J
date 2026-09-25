@@ -514,4 +514,24 @@ final class TaskTests: XCTestCase {
         XCTAssertTrue(TaskStatistics.logs(0, through: date(23), records: [restored], calendar: calendar).isEmpty)
     }
 
+    @MainActor func testManualTimingValidatesAndUpdatesCompletion() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let store = TaskStore(repository: repo)
+        let task = item(.daily)
+        XCTAssertTrue(store.add(task))
+        XCTAssertTrue(store.recordTiming(task, workday: date(21), startedAt: date(21, hour: 23), finishedAt: date(22, hour: 2), now: date(25), calendar: calendar))
+        XCTAssertTrue(store.items[0].isCompleted(on: date(21), calendar: calendar))
+        XCTAssertEqual(store.items[0].activities[0].elapsed, 3 * 3600)
+        let original = store.records
+        XCTAssertFalse(store.recordTiming(task, workday: date(21), startedAt: date(22, hour: 6), finishedAt: nil, now: date(25), calendar: calendar))
+        XCTAssertFalse(store.recordTiming(task, workday: date(21), startedAt: date(21, hour: 23), finishedAt: date(21, hour: 22), now: date(25), calendar: calendar))
+        XCTAssertFalse(store.recordTiming(task, workday: date(26), startedAt: date(26), finishedAt: nil, now: date(25), calendar: calendar))
+        XCTAssertEqual(store.records, original)
+        XCTAssertTrue(store.recordTiming(task, workday: date(21), startedAt: date(21, hour: 22), finishedAt: nil, now: date(25), calendar: calendar))
+        XCTAssertFalse(store.items[0].isCompleted(on: date(21), calendar: calendar))
+        XCTAssertEqual(try repo.load(), store.records)
+    }
+
+
 }

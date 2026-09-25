@@ -92,6 +92,38 @@ final class TaskStore {
     }
 
     @discardableResult
+    func recordTiming(_ item: TodoItem, workday: Date, startedAt: Date?, finishedAt: Date?,
+                      now: Date = .now, calendar: Calendar = .current) -> Bool {
+        guard let index = records.firstIndex(where: { $0.id == item.id && $0.archivedOn == nil }) else { return false }
+        let current = records[index]
+        let day = TaskDay(workday, calendar: calendar)
+        guard current.occurs(on: workday, calendar: calendar),
+              startedAt != nil || finishedAt != nil,
+              startedAt.map({ $0 <= now }) ?? true, finishedAt.map({ $0 <= now }) ?? true,
+              (startedAt == nil || finishedAt == nil || finishedAt! >= startedAt!),
+              [startedAt, finishedAt].compactMap({ $0 }).allSatisfy({ instant in
+                  let actualDay = TaskClock.dayDate(for: instant, calendar: calendar)
+                  return current.repeatRule == .period ? current.occurs(on: actualDay, calendar: calendar)
+                      : TaskDay(actualDay, calendar: calendar) == day
+              }) else {
+            errorMessage = "작업일에 해당하는 과거 시각을 입력해주세요. 완료 시각은 시작 이후여야 합니다."
+            return false
+        }
+        var next = records
+        let activityIndex = current.repeatRule == .period ? current.activities.indices.last
+            : current.activities.lastIndex { $0.day == day }
+        let activity = TaskActivity(day: day, startedAt: startedAt, finishedAt: finishedAt)
+        if let activityIndex { next[index].activities[activityIndex] = activity }
+        else { next[index].activities.append(activity) }
+        if current.repeatRule == .period { next[index].completedDays.removeAll() }
+        else { next[index].completedDays.remove(day) }
+        if let finishedAt {
+            next[index].completedDays.insert(TaskDay(TaskClock.dayDate(for: finishedAt, calendar: calendar), calendar: calendar))
+        }
+        return persist(next)
+    }
+
+    @discardableResult
     func setPriority(_ priority: TaskPriority, for item: TodoItem) -> Bool {
         guard let index = records.firstIndex(where: { $0.id == item.id && $0.archivedOn == nil }) else { return false }
         var next = records
@@ -155,3 +187,4 @@ final class TaskStore {
         }
     }
 }
+

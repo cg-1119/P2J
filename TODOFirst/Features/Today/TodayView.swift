@@ -237,6 +237,7 @@ private struct TaskRow: View {
 }
 
 struct TaskTimingView: View {
+    @State private var editingTime = false
     @Environment(TaskStore.self) private var store
     let item: TodoItem
     let date: Date
@@ -244,6 +245,7 @@ struct TaskTimingView: View {
     var body: some View {
         let activity = item.activity(on: date)
         VStack(alignment: .leading, spacing: 5) {
+            Button("시간 기록·수정", systemImage: "clock.badge") { editingTime = true }.buttonStyle(.borderless)
             if let start = activity?.startedAt {
                 Label("시작 \(start.formatted(date: .abbreviated, time: .shortened))", systemImage: "play.circle")
             }
@@ -264,5 +266,67 @@ struct TaskTimingView: View {
             }
         }
         .font(.caption).foregroundStyle(.secondary)
+        .contextMenu { Button("시간 기록·수정") { editingTime = true } }
+        .sheet(isPresented: $editingTime) { TaskTimeEditor(item: item, date: date).environment(store) }
     }
+}
+
+private struct TaskTimeEditor: View {
+    @Environment(TaskStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+    let item: TodoItem
+    @State private var workday: Date
+    @State private var startedAt: Date
+    @State private var finishedAt: Date
+    @State private var hasStart: Bool
+    @State private var hasFinish: Bool
+    init(item: TodoItem, date: Date) {
+        self.item = item
+        let activity = item.activity(on: date)
+        _workday = State(initialValue: date)
+        _startedAt = State(initialValue: activity?.startedAt ?? .now)
+        _finishedAt = State(initialValue: activity?.finishedAt ?? .now)
+        _hasStart = State(initialValue: activity?.startedAt != nil)
+        _hasFinish = State(initialValue: activity?.finishedAt != nil)
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("시간 기록·수정").font(.title2.bold())
+            Text(item.title).foregroundStyle(.secondary)
+            TaskDateButton(label: "기록할 작업일", date: $workday)
+                .onChange(of: workday) { _, day in
+                    let activity = item.activity(on: day)
+                    hasStart = activity?.startedAt != nil; hasFinish = activity?.finishedAt != nil
+                    startedAt = activity?.startedAt ?? day; finishedAt = activity?.finishedAt ?? day
+                }
+            Toggle("시작 시각 기록", isOn: $hasStart)
+            if hasStart { timeInput("실제 시작", value: $startedAt) }
+            Toggle("완료 시각 기록", isOn: $hasFinish)
+            if hasFinish { timeInput("실제 완료", value: $finishedAt) }
+            Text("오전 6시 기준 작업일입니다. 완료 시각을 기록하면 완료 처리하며, 해제하면 해당 완료 기록도 취소됩니다. 소요 시간에는 휴식이 포함됩니다.")
+                .font(.caption).foregroundStyle(.secondary)
+            if let error = store.errorMessage { Text(error).font(.caption).foregroundStyle(.red) }
+            HStack {
+                Spacer()
+                Button("취소") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("저장") {
+                    if store.recordTiming(item, workday: workday, startedAt: hasStart ? startedAt : nil,
+                                          finishedAt: hasFinish ? finishedAt : nil) { dismiss() }
+                }.buttonStyle(.borderedProminent).tint(.teal).disabled(!hasStart && !hasFinish)
+            }
+        }.padding(24).frame(width: 520)
+    }
+    private func timeInput(_ label: String, value: Binding<Date>) -> some View {
+        HStack(spacing: 12) {
+            TaskDateButton(label: label, date: Binding(get: { value.wrappedValue }, set: { day in
+                let clock = Calendar.current.dateComponents([.hour, .minute], from: value.wrappedValue)
+                value.wrappedValue = Calendar.current.date(bySettingHour: clock.hour ?? 12,
+                                                          minute: clock.minute ?? 0, second: 0, of: day)!
+            }))
+            DatePicker(label, selection: value, displayedComponents: .hourAndMinute)
+                .labelsHidden().padding(12)
+                .background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
 }
