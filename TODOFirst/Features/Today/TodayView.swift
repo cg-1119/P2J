@@ -267,21 +267,24 @@ struct TaskTimingView: View {
         }
         .font(.caption).foregroundStyle(.secondary)
         .contextMenu { Button("시간 기록·수정") { editingTime = true } }
-        .sheet(isPresented: $editingTime) { TaskTimeEditor(item: item, date: date).environment(store) }
+        .sheet(isPresented: $editingTime) {
+            TaskTimeEditor(item: item, date: date, isPresented: $editingTime).environment(store)
+        }
     }
 }
 
 private struct TaskTimeEditor: View {
     @Environment(TaskStore.self) private var store
-    @Environment(\.dismiss) private var dismiss
+    @Binding private var isPresented: Bool
     let item: TodoItem
     @State private var workday: Date
     @State private var startedAt: Date
     @State private var finishedAt: Date
     @State private var hasStart: Bool
     @State private var hasFinish: Bool
-    init(item: TodoItem, date: Date) {
+    init(item: TodoItem, date: Date, isPresented: Binding<Bool>) {
         self.item = item
+        _isPresented = isPresented
         let activity = item.activity(on: date)
         _workday = State(initialValue: date)
         _startedAt = State(initialValue: activity?.startedAt ?? .now)
@@ -308,10 +311,10 @@ private struct TaskTimeEditor: View {
             if let error = store.errorMessage { Text(error).font(.caption).foregroundStyle(.red) }
             HStack {
                 Spacer()
-                Button("취소") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("취소") { isPresented = false }.keyboardShortcut(.cancelAction)
                 Button("저장") {
                     if store.recordTiming(item, workday: workday, startedAt: hasStart ? startedAt : nil,
-                                          finishedAt: hasFinish ? finishedAt : nil) { dismiss() }
+                                          finishedAt: hasFinish ? finishedAt : nil) { isPresented = false }
                 }.buttonStyle(.borderedProminent).tint(.teal).disabled(!hasStart && !hasFinish)
             }
         }.padding(24).frame(width: 520)
