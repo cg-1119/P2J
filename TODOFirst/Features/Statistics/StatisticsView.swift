@@ -2,6 +2,7 @@ import SwiftUI
 import Charts
 
 struct StatisticsView: View {
+    @Environment(TaskStore.self) private var store
     let records: [TodoItem]
     let date: Date
     @State private var days = 7
@@ -60,18 +61,22 @@ struct StatisticsView: View {
                 }
                 Text("기간 작업은 조회 기간과 겹치는 작업을 한 번만, 매일·매주 작업은 예정된 날짜마다 한 회로 계산합니다. 합계는 작업 건수와 반복 수행 횟수를 합친 값입니다.")
                     .font(.caption).foregroundStyle(.secondary)
+                if store.recordingMode == .detailed {
                 HStack(spacing: 16) {
                     metric("기록된 총 소요", value: measured.isEmpty ? "기록 없음" : TaskStatistics.durationLabel(measured.reduce(0, +)))
                     metric("시간 기록 완료", value: "\(measured.count)건")
                 }
+                }
                 HStack(spacing: 16) {
                     metric("완료한 날", value: "\(Set(logs.filter(\.completed).map(\.day)).count) / \(days)일")
-                    metric("평균 소요", value: measured.isEmpty ? "기록 없음" : TaskStatistics.durationLabel(measured.reduce(0, +) / Double(measured.count)))
+                    if store.recordingMode == .detailed { metric("평균 소요", value: measured.isEmpty ? "기록 없음" : TaskStatistics.durationLabel(measured.reduce(0, +) / Double(measured.count))) }
                     metric("이전 \(days)일 대비", value: "\(difference > 0 ? "+" : "")\(difference)개")
                 }
+                if store.recordingMode == .detailed {
                 Text("평균 소요는 시작·완료 시각이 모두 있는 \(measured.count)건의 경과 시간입니다. 휴식 시간도 포함되며, 실제 집중 시간을 뜻하지 않습니다.")
                     .font(.caption).foregroundStyle(.secondary)
 
+                }
                 if total == 0 {
                     Text("선택한 기간에 계획한 일이 없어요. 첫 할 일을 등록해보세요.")
                         .foregroundStyle(.secondary).padding(.vertical, 12)
@@ -112,6 +117,7 @@ struct StatisticsView: View {
                 }
                 .padding(18).background(.teal.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
 
+                if store.recordingMode == .detailed {
                 HStack {
                     Label("작업별 시간 기록", systemImage: "clock").font(.headline)
                     Spacer()
@@ -148,6 +154,7 @@ struct StatisticsView: View {
                 }
                 Text("완료 기록은 완료한 작업일, 미완료 시작 기록은 시작한 작업일에 표시합니다. 이전 버전의 완료 날짜는 보존하며 시각을 추정하지 않습니다.")
                     .font(.caption).foregroundStyle(.secondary)
+                }
                 Text("일별 기록").font(.headline)
                 ForEach(history.reversed()) { day in
                     HStack {

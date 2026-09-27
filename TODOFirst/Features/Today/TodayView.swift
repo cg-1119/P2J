@@ -67,6 +67,7 @@ struct TodayView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                SettingsLink { Image(systemName: "gearshape") }.help("설정 (⌘,)")
                 Button {
                     editor = .new(UUID())
                 } label: {
@@ -88,7 +89,6 @@ struct TodayView: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .frame(maxWidth: 340)
-                TaskRecordingModePicker()
                 if store.recordingMode == .detailed {
                     Text("시작 → 종료를 직접 기록해요. 오전 6시가 지나도 종료하지 않으면 미완료예요.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -212,7 +212,7 @@ private struct TaskRow: View {
                 if let end = item.endDay?.date(), item.repeatRule == .period {
                     Text("종료: \(end.formatted(date: .abbreviated, time: .omitted))").font(.caption).foregroundStyle(.secondary)
                 }
-                TaskTimingView(item: item, date: date)
+                if store.recordingMode == .detailed { TaskTimingView(item: item, date: date) }
                 ForEach(item.subtasks) { subtask in
                     Toggle(isOn: Binding(get: {
                         item.isSubtaskCompleted(subtask, on: date)
@@ -353,19 +353,6 @@ private struct TaskTimeEditor: View {
         }
     }
 
-}
-
-struct TaskRecordingModePicker: View {
-    @Environment(TaskStore.self) private var store
-    var body: some View {
-        HStack(spacing: 10) {
-            Text("기록 모드").font(.caption).foregroundStyle(.secondary)
-            Picker("기록 모드", selection: Binding(get: { store.recordingMode }, set: { store.setRecordingMode($0) })) {
-                ForEach(TaskRecordingMode.allCases) { mode in Text(mode.title).tag(mode) }
-            }
-            .labelsHidden().pickerStyle(.segmented).frame(maxWidth: 260)
-        }
-    }
 }
 
 struct TaskCompletionControl: View {

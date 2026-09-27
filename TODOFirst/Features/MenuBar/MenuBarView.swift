@@ -23,7 +23,6 @@ struct MenuBarView: View {
                 Text(date, format: .dateTime.month().day().weekday())
                     .font(.caption).foregroundStyle(.secondary)
             }
-            TaskRecordingModePicker()
             HStack {
                 Text("오늘 할 일").font(.subheadline.bold())
                 Spacer()
@@ -55,7 +54,7 @@ struct MenuBarView: View {
                                         .foregroundStyle(item.isCompleted(on: date) ? .secondary : .primary)
                                         .help(item.title)
                                     Text(item.repeatRule.title).font(.caption2).foregroundStyle(.secondary)
-                                    TaskTimingView(item: item, date: date)
+                                    if store.recordingMode == .detailed { TaskTimingView(item: item, date: date) }
                                     if !item.subtasks.isEmpty {
                                         Text("하위 TODO \(item.subtasks.filter { item.isSubtaskCompleted($0, on: date) }.count)/\(item.subtasks.count)")
                                             .font(.caption2).foregroundStyle(.teal)
@@ -99,6 +98,7 @@ struct MenuBarView: View {
                 }
                 .keyboardShortcut("o")
                 Spacer()
+                SettingsLink { Image(systemName: "gearshape") }.help("설정")
                 Button("종료", systemImage: "power") { NSApplication.shared.terminate(nil) }
                     .keyboardShortcut("q")
             }
