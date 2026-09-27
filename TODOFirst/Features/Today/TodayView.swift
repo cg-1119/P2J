@@ -126,7 +126,6 @@ struct TodayView: View {
                     LazyVStack(spacing: 10) {
                         ForEach(tasks) { item in
                             TaskRow(item: item, date: date,
-                                    onToggle: { store.toggleCompletion(item) },
                                     onPriority: { store.setPriority($0, for: item) },
                                     onEdit: { editor = .edit(item) },
                                     onDelete: { pendingDeletion = item })
@@ -186,7 +185,6 @@ private struct TaskRow: View {
     @Environment(TaskStore.self) private var store
     let item: TodoItem
     let date: Date
-    let onToggle: () -> Void
     let onPriority: (TaskPriority) -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
@@ -219,7 +217,7 @@ private struct TaskRow: View {
                 ForEach(item.subtasks) { subtask in
                     Toggle(isOn: Binding(get: {
                         item.isSubtaskCompleted(subtask, on: date)
-                    }, set: { _ in store.toggleSubtask(subtask.id, in: item) })) {
+                    }, set: { store.setSubtaskCompletion($0, id: subtask.id, in: item) })) {
                         Text(subtask.title).font(.callout)
                     }
                     .toggleStyle(.checkbox)
@@ -368,7 +366,7 @@ struct TaskCompletionControl: View {
                 .foregroundStyle(item.isCompleted(on: date) ? Color.teal : Color.secondary)
                 .accessibilityLabel(item.isCompleted(on: date) ? "완료" : "미완료")
         } else {
-            Toggle(isOn: Binding(get: { item.isCompleted(on: date) }, set: { _ in store.toggleCompletion(item) })) {
+            Toggle(isOn: Binding(get: { item.isCompleted(on: date) }, set: { store.setCompletion($0, for: item) })) {
                 Text("\(item.title) 오늘 완료")
             }
             .labelsHidden().toggleStyle(.checkbox)

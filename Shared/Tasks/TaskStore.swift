@@ -69,13 +69,21 @@ final class TaskStore {
 
     @discardableResult
     func toggleCompletion(_ item: TodoItem, on instant: Date = .now, calendar: Calendar = .current) -> Bool {
+        guard let current = records.first(where: { $0.id == item.id }) else { return false }
+        let date = TaskClock.dayDate(for: instant, calendar: calendar)
+        return setCompletion(!current.isCompleted(on: date, calendar: calendar), for: current, on: instant, calendar: calendar)
+    }
+
+    @discardableResult
+    func setCompletion(_ completed: Bool, for item: TodoItem, on instant: Date = .now, calendar: Calendar = .current) -> Bool {
         let date = TaskClock.dayDate(for: instant, calendar: calendar)
         guard let index = records.firstIndex(where: { $0.id == item.id }),
               records[index].archivedOn == nil,
               records[index].occurs(on: date, calendar: calendar) else { return false }
+        guard records[index].isCompleted(on: date, calendar: calendar) != completed else { return true }
         var next = records
         let day = TaskDay(date, calendar: calendar)
-        let undo = next[index].isCompleted(on: date, calendar: calendar)
+        let undo = !completed
         if !undo && recordingMode == .detailed {
             guard let start = next[index].activity(on: date, calendar: calendar)?.startedAt, start <= instant else {
                 errorMessage = "상세 기록 모드는 시작을 누른 뒤 종료해주세요."
@@ -190,16 +198,27 @@ final class TaskStore {
 
     @discardableResult
     func toggleSubtask(_ id: UUID, in item: TodoItem, on instant: Date = .now, calendar: Calendar = .current) -> Bool {
+        guard let current = records.first(where: { $0.id == item.id }),
+              let child = current.subtasks.first(where: { $0.id == id }) else { return false }
+        let date = TaskClock.dayDate(for: instant, calendar: calendar)
+        return setSubtaskCompletion(!current.isSubtaskCompleted(child, on: date, calendar: calendar), id: id,
+                                    in: current, on: instant, calendar: calendar)
+    }
+
+    @discardableResult
+    func setSubtaskCompletion(_ completed: Bool, id: UUID, in item: TodoItem,
+                              on instant: Date = .now, calendar: Calendar = .current) -> Bool {
         let date = TaskClock.dayDate(for: instant, calendar: calendar)
         guard let i = records.firstIndex(where: { $0.id == item.id && $0.archivedOn == nil }),
               records[i].occurs(on: date, calendar: calendar),
               let j = records[i].subtasks.firstIndex(where: { $0.id == id }) else { return false }
+        guard records[i].isSubtaskCompleted(records[i].subtasks[j], on: date, calendar: calendar) != completed else { return true }
         var next = records
         let day = TaskDay(date, calendar: calendar)
         if next[i].repeatRule == .period {
-            if next[i].subtasks[j].completedDays.isEmpty { next[i].subtasks[j].completedDays = [day] }
+            if completed { next[i].subtasks[j].completedDays = [day] }
             else { next[i].subtasks[j].completedDays = [] }
-        } else if next[i].subtasks[j].completedDays.contains(day) { next[i].subtasks[j].completedDays.remove(day) }
+        } else if !completed { next[i].subtasks[j].completedDays.remove(day) }
         else { next[i].subtasks[j].completedDays.insert(day) }
         return persist(next)
     }

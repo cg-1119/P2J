@@ -60,7 +60,7 @@ struct MenuBarView: View {
                                         ForEach(item.subtasks) { subtask in
                                             Toggle(isOn: Binding(
                                                 get: { item.isSubtaskCompleted(subtask, on: date) },
-                                                set: { _ in store.toggleSubtask(subtask.id, in: item) }
+                                                set: { store.setSubtaskCompletion($0, id: subtask.id, in: item) }
                                             )) {
                                                 Text(subtask.title).font(.callout).fixedSize(horizontal: false, vertical: true)
                                                     .strikethrough(item.isSubtaskCompleted(subtask, on: date))

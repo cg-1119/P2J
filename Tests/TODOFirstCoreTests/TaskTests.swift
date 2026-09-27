@@ -712,4 +712,52 @@ final class TaskTests: XCTestCase {
         XCTAssertEqual(publishes, before + 1)
     }
 
+    @MainActor func testRepeatedCompletionInputPreservesTimingAndDoesNotPublish() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        var publishes = 0
+        let store = TaskStore(repository: repo, didChange: { _ in publishes += 1 })
+        let snapshot = item(.daily)
+        XCTAssertTrue(store.add(snapshot))
+        store.setRecordingMode(.detailed)
+        XCTAssertTrue(store.start(snapshot, on: date(21, hour: 10), calendar: calendar))
+        XCTAssertTrue(store.setCompletion(true, for: snapshot, on: date(21), calendar: calendar))
+        let saved = store.items
+        let count = publishes
+        // 두 창이 가진 오래된 스냅샷에서 같은 값을 전달해도 종료 시각을 덮어쓰지 않습니다.
+        XCTAssertTrue(store.setCompletion(true, for: snapshot, on: date(21, hour: 13), calendar: calendar))
+        XCTAssertEqual(store.items, saved)
+        XCTAssertEqual(publishes, count)
+        XCTAssertTrue(store.setCompletion(false, for: snapshot, on: date(21, hour: 14), calendar: calendar))
+        let undone = store.items
+        XCTAssertTrue(store.setCompletion(false, for: snapshot, on: date(21, hour: 15), calendar: calendar))
+        XCTAssertEqual(store.items, undone)
+        XCTAssertEqual(publishes, count + 1)
+    }
+
+    @MainActor func testSubtaskDesiredStateIsIdempotentForDailyAndPeriod() throws {
+        for rule in [TaskRepeat.daily, .period] {
+            let repo = repository()
+            defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+            var publishes = 0
+            let store = TaskStore(repository: repo, didChange: { _ in publishes += 1 })
+            let child = Subtask(title: "하위 검증")
+            let snapshot = TodoItem(title: "부모 검증", repeatRule: rule, startDate: date(21),
+                                    endDate: rule == .period ? date(23) : nil, subtasks: [child], calendar: calendar)
+            XCTAssertTrue(store.add(snapshot))
+            XCTAssertTrue(store.setSubtaskCompletion(true, id: child.id, in: snapshot, on: date(21), calendar: calendar))
+            let count = publishes
+            XCTAssertTrue(store.setSubtaskCompletion(true, id: child.id, in: snapshot, on: date(21), calendar: calendar))
+            XCTAssertEqual(publishes, count)
+            XCTAssertTrue(store.setSubtaskCompletion(true, id: child.id, in: snapshot, on: date(22), calendar: calendar))
+            XCTAssertEqual(publishes, count + (rule == .daily ? 1 : 0))
+            XCTAssertTrue(store.setSubtaskCompletion(false, id: child.id, in: snapshot, on: date(22), calendar: calendar))
+            let saved = store.items
+            let undoneCount = publishes
+            XCTAssertTrue(store.setSubtaskCompletion(false, id: child.id, in: snapshot, on: date(22), calendar: calendar))
+            XCTAssertEqual(store.items, saved)
+            XCTAssertEqual(publishes, undoneCount)
+        }
+    }
+
 }
