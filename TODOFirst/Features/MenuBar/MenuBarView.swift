@@ -6,9 +6,8 @@ struct MenuBarView: View {
     @Environment(TaskStore.self) private var store
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { context in
-            content(on: TaskClock.dayDate(for: context.date))
-        }
+        content(on: store.workday)
+        .modifier(WorkdayRefresh())
         .padding(18)
         .frame(width: 390)
     }

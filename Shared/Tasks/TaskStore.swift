@@ -7,6 +7,7 @@ final class TaskStore {
     var items: [TodoItem] { records.filter { $0.archivedOn == nil } }
     private(set) var errorMessage: String?
     private(set) var isReady = false
+    private(set) var workday = TaskClock.dayDate()
     private(set) var recordingMode: TaskRecordingMode
     private let preferences: UserDefaults?
     private let repository: TaskRepository?
@@ -23,6 +24,15 @@ final class TaskStore {
             self.errorMessage = error.localizedDescription
         }
         reload()
+    }
+
+    /// 같은 작업일에는 observable 상태를 쓰지 않아 목록 갱신을 발생시키지 않습니다.
+    @discardableResult
+    func refreshWorkday(at instant: Date = .now, calendar: Calendar = .current) -> Bool {
+        let next = TaskClock.dayDate(for: instant, calendar: calendar)
+        guard workday != next else { return false }
+        workday = next
+        return true
     }
 
     func setRecordingMode(_ mode: TaskRecordingMode) {
@@ -146,6 +156,7 @@ final class TaskStore {
     @discardableResult
     func setPriority(_ priority: TaskPriority, for item: TodoItem) -> Bool {
         guard let index = records.firstIndex(where: { $0.id == item.id && $0.archivedOn == nil }) else { return false }
+        guard records[index].priority != priority else { return true }
         var next = records
         next[index].priority = priority
         return persist(next)

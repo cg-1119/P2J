@@ -1,4 +1,6 @@
 import SwiftUI
+import AppKit
+import Combine
 
 private enum TaskFilter: String, CaseIterable, Identifiable {
     case today = "오늘", recurring = "반복 일정", all = "전체", statistics = "통계"
@@ -25,9 +27,8 @@ struct TodayView: View {
     @State private var pendingDeletion: TodoItem?
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { context in
-            content(on: TaskClock.dayDate(for: context.date))
-        }
+        content(on: store.workday)
+        .modifier(WorkdayRefresh())
         .sheet(item: $editor) { route in
             NewTaskView(item: route.item) { editor = nil }
                 .environment(store)
@@ -372,5 +373,18 @@ struct TaskCompletionControl: View {
             .disabled(!item.occurs(on: date))
             .help(item.occurs(on: date) ? "오늘 완료 표시 또는 취소" : "오늘 해당하지 않는 일정입니다")
         }
+    }
+}
+
+
+/// 화면을 정기적으로 다시 그리지 않고 날짜 변화만 확인합니다.
+struct WorkdayRefresh: ViewModifier {
+    @Environment(TaskStore.self) private var store
+    func body(content: Content) -> some View {
+        content
+            .onAppear { store.refreshWorkday() }
+            .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { store.refreshWorkday(at: $0) }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in store.refreshWorkday() }
+            .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)) { _ in store.refreshWorkday() }
     }
 }

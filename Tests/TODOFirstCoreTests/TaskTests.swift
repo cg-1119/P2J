@@ -674,4 +674,42 @@ final class TaskTests: XCTestCase {
         XCTAssertNotNil(store.items[0].activities[0].finishedAt)
     }
 
+    @MainActor func testIdleClockOnlyChangesAtWorkdayBoundaryAndDoesNotWriteRecords() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        var publishes = 0
+        let store = TaskStore(repository: repo, didChange: { _ in publishes += 1 })
+        XCTAssertTrue(store.add(item(.daily)))
+        let before = try Data(contentsOf: repo.fileURL)
+        let count = publishes
+        _ = store.refreshWorkday(at: date(21, hour: 12), calendar: calendar)
+        let workday = store.workday
+        for seconds in stride(from: 0, to: 3600, by: 30) {
+            XCTAssertFalse(store.refreshWorkday(at: date(21, hour: 12).addingTimeInterval(Double(seconds)), calendar: calendar))
+        }
+        XCTAssertFalse(store.refreshWorkday(at: date(22, hour: 5), calendar: calendar))
+        XCTAssertEqual(store.workday, workday)
+        XCTAssertTrue(store.refreshWorkday(at: date(22, hour: 6), calendar: calendar))
+        XCTAssertEqual(TaskDay(store.workday, calendar: calendar), TaskDay(date(22), calendar: calendar))
+        // 며칠간 잠든 뒤 깨어나도 중간 타이머를 재생하지 않고 현재 작업일로 이동합니다.
+        XCTAssertTrue(store.refreshWorkday(at: date(25, hour: 8), calendar: calendar))
+        XCTAssertEqual(TaskDay(store.workday, calendar: calendar), TaskDay(date(25), calendar: calendar))
+        XCTAssertEqual(publishes, count)
+        XCTAssertEqual(try Data(contentsOf: repo.fileURL), before)
+    }
+
+    @MainActor func testSelectingCurrentPriorityDoesNotRepublish() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        var publishes = 0
+        let store = TaskStore(repository: repo, didChange: { _ in publishes += 1 })
+        let task = item(.once)
+        XCTAssertTrue(store.add(task))
+        let before = publishes
+        XCTAssertTrue(store.setPriority(task.priority, for: task))
+        XCTAssertEqual(publishes, before)
+        XCTAssertTrue(store.setPriority(.high, for: task))
+        XCTAssertEqual(publishes, before + 1)
+    }
+
 }

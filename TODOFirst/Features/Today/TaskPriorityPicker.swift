@@ -5,15 +5,21 @@ struct TaskPriorityPicker: View {
     @Binding var priority: TaskPriority
 
     var body: some View {
-        Picker("\(title) 우선순위", selection: $priority) {
+        Menu {
             ForEach(TaskPriority.allCases) { value in
-                Text(value.title).tag(value)
+                Button {
+                    if priority != value { priority = value }
+                } label: {
+                    if priority == value { Label(value.title, systemImage: "checkmark") }
+                    else { Text(value.title) }
+                }
             }
+        } label: {
+            Text(priority.title)
         }
-        .labelsHidden()
-        .pickerStyle(.menu)
         .fixedSize()
         .foregroundStyle(priority == .high ? Color.orange : Color.secondary)
+        .accessibilityLabel("\(title) 우선순위")
         .help("우선순위: \(priority.title)")
     }
 }

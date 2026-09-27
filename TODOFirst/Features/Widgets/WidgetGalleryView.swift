@@ -5,8 +5,8 @@ struct WidgetGalleryView: View {
     @Environment(WidgetSync.self) private var sync
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { context in
-            let model = WidgetDayModel(date: context.date, records: store.records)
+        Group {
+            let model = WidgetDayModel(date: store.workday, records: store.records)
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     Text("오늘을 데스크톱에").font(.largeTitle.bold())
@@ -37,6 +37,7 @@ struct WidgetGalleryView: View {
                 .padding(28)
             }
         }
+        .modifier(WorkdayRefresh())
         .frame(minWidth: 680, minHeight: 510)
     }
 
