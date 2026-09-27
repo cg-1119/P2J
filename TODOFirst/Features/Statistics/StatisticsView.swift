@@ -131,7 +131,7 @@ struct StatisticsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(alignment: .top) {
                             Image(systemName: entry.completed ? "checkmark.circle.fill" : "play.circle.fill").foregroundStyle(.teal)
-                            Text(entry.title).font(.headline).textSelection(.enabled)
+                            Text(entry.title).font(.headline)
                             Spacer()
                             Text(entry.completed ? "완료" : "미완료 · 종료 미기록").font(.caption).foregroundStyle(.secondary)
                         }
@@ -177,7 +177,7 @@ struct StatisticsView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label).font(.caption).foregroundStyle(.secondary)
             Text(date?.formatted(date: .abbreviated, time: .shortened) ?? "시각 기록 없음")
-                .font(.callout).textSelection(.enabled)
+                .font(.callout)
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
 

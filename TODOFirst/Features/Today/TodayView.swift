@@ -194,7 +194,7 @@ private struct TaskRow: View {
             TaskCompletionControl(item: item, date: date)
                 .padding(.top, 3)
             VStack(alignment: .leading, spacing: 5) {
-                Text(item.title).font(.headline).textSelection(.enabled)
+                Text(item.title).font(.headline)
                     .strikethrough(item.isCompleted(on: date))
                     .foregroundStyle(item.isCompleted(on: date) ? .secondary : .primary)
                 if !item.note.isEmpty {
