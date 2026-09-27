@@ -3,8 +3,7 @@ import AppKit
 
 struct NewTaskView: View {
     @Environment(TaskStore.self) private var store
-    @Environment(\.dismiss) private var dismiss
-    @FocusState private var titleFocused: Bool
+    private let close: () -> Void
     @State private var title = ""
     @State private var note = ""
     @State private var repeatRule: TaskRepeat = .once
@@ -15,7 +14,8 @@ struct NewTaskView: View {
     @State private var subtasks: [Subtask] = []
     private let editingItem: TodoItem?
 
-    init(item: TodoItem? = nil) {
+    init(item: TodoItem? = nil, close: @escaping () -> Void) {
+        self.close = close
         editingItem = item
         _endDate = State(initialValue: item?.endDay?.date() ?? item?.startDay.date() ?? TaskClock.dayDate())
         _subtasks = State(initialValue: item?.subtasks ?? [])
@@ -52,10 +52,9 @@ struct NewTaskView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     card("무엇을 할까요?", symbol: "pencil.line") {
                         LiveTitleField(text: $title)
-                            .focused($titleFocused)
                             .frame(height: 26).padding(12)
                             .background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(titleFocused ? Color.teal.opacity(0.6) : Color.primary.opacity(0.08)))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.08)))
                             .accessibilityIdentifier("taskTitle")
                         TextField("메모를 남겨보세요 (선택)", text: $note, axis: .vertical)
                             .textFieldStyle(.plain).lineLimit(2...4).padding(12)
@@ -125,7 +124,7 @@ struct NewTaskView: View {
             HStack {
                 Label("이 Mac에 저장", systemImage: "lock").font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Button("취소") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("취소") { close() }.keyboardShortcut(.cancelAction)
                 Button(editingItem == nil ? "할 일 등록" : "변경 저장", action: save)
                     .buttonStyle(.borderedProminent).tint(.teal)
                     .keyboardShortcut(.defaultAction).disabled(!valid)
@@ -134,8 +133,7 @@ struct NewTaskView: View {
             .controlSize(.large).padding(20)
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .frame(width: 600, height: 740)
-        .onAppear { titleFocused = true }
+        .frame(width: 600, height: min(740, max(420, (NSScreen.main?.visibleFrame.height ?? 860) - 120)))
     }
 
     private func card<Content: View>(_ title: String, symbol: String, @ViewBuilder content: () -> Content) -> some View {
@@ -173,7 +171,7 @@ struct NewTaskView: View {
             saved = store.add(TodoItem(title: title, note: note, repeatRule: repeatRule,
                                       startDate: date, priority: priority, endDate: repeatRule == .period ? endDate : nil, subtasks: subtasks))
         }
-        if saved { dismiss() }
+        if saved { close() }
     }
 }
 
@@ -271,7 +269,7 @@ private struct LiveTitleField: NSViewRepresentable {
     @Binding var text: String
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSTextField {
-        let field = NSTextField()
+        let field = TaskTitleTextField()
         field.placeholderString = "예: 이번 주 포트폴리오 마무리"
         field.isBordered = false
         field.drawsBackground = false
@@ -279,6 +277,8 @@ private struct LiveTitleField: NSViewRepresentable {
         field.font = .systemFont(ofSize: 16, weight: .medium)
         field.delegate = context.coordinator
         field.isContinuous = true
+        field.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         field.setAccessibilityLabel("할 일 제목")
         return field
     }
@@ -294,5 +294,19 @@ private struct LiveTitleField: NSViewRepresentable {
             parent.text = field.stringValue
         }
         func controlTextDidEndEditing(_ notification: Notification) { controlTextDidChange(notification) }
+    }
+}
+
+/// 시트 레이아웃 이후에 한 번만 포커스를 옮겨 SwiftUI 포커스 갱신과의 충돌을 피합니다.
+private final class TaskTitleTextField: NSTextField {
+    private var requestedInitialFocus = false
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil, !requestedInitialFocus else { return }
+        requestedInitialFocus = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let window = self.window, window.firstResponder === window else { return }
+            window.makeFirstResponder(self)
+        }
     }
 }

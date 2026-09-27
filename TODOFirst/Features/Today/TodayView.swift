@@ -5,24 +5,31 @@ private enum TaskFilter: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+private enum TaskEditorRoute: Identifiable {
+    case new(UUID)
+    case edit(TodoItem)
+    var id: UUID {
+        switch self { case .new(let id): id; case .edit(let item): item.id }
+    }
+    var item: TodoItem? {
+        if case .edit(let item) = self { return item }
+        return nil
+    }
+}
+
 struct TodayView: View {
     @Environment(TaskStore.self) private var store
     @Environment(\.openWindow) private var openWindow
     @State private var filter: TaskFilter = .today
-    @State private var showingNewTask = false
-    @State private var editingItem: TodoItem?
+    @State private var editor: TaskEditorRoute?
     @State private var pendingDeletion: TodoItem?
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             content(on: TaskClock.dayDate(for: context.date))
         }
-        .sheet(isPresented: $showingNewTask) {
-            NewTaskView()
-                .environment(store)
-        }
-        .sheet(item: $editingItem) { item in
-            NewTaskView(item: item)
+        .sheet(item: $editor) { route in
+            NewTaskView(item: route.item) { editor = nil }
                 .environment(store)
         }
         .confirmationDialog("할 일을 삭제할까요?", isPresented: Binding(
@@ -61,7 +68,7 @@ struct TodayView: View {
                 }
                 Spacer()
                 Button {
-                    showingNewTask = true
+                    editor = .new(UUID())
                 } label: {
                     Label("할 일 추가", systemImage: "plus")
                 }
@@ -102,7 +109,7 @@ struct TodayView: View {
                 } description: {
                     Text(emptyDescription)
                 } actions: {
-                    Button("첫 할 일 등록") { showingNewTask = true }
+                    Button("첫 할 일 등록") { editor = .new(UUID()) }
                         .disabled(!store.isReady)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -113,7 +120,7 @@ struct TodayView: View {
                             TaskRow(item: item, date: date,
                                     onToggle: { store.toggleCompletion(item) },
                                     onPriority: { store.setPriority($0, for: item) },
-                                    onEdit: { editingItem = item },
+                                    onEdit: { editor = .edit(item) },
                                     onDelete: { pendingDeletion = item })
                                 .disabled(!store.isReady)
                         }
