@@ -1,5 +1,6 @@
 // macOS 15+ / ScreenCaptureKit. 데모 앱의 창만 녹화하며 커서·오디오는 수집하지 않습니다.
 import Foundation
+import CoreGraphics
 import ScreenCaptureKit
 import AVFoundation
 
@@ -12,7 +13,7 @@ final class RecordingDelegate: NSObject, SCRecordingOutputDelegate, @unchecked S
         self.error = error; finished = true
     }
 }
-@main struct Recorder {
+struct Recorder {
     static func main() async {
         do { try await record() }
         catch {
@@ -20,20 +21,24 @@ final class RecordingDelegate: NSObject, SCRecordingOutputDelegate, @unchecked S
             exit(1)
         }
     }
-    static func record() async throws {
+    static func record(arguments: [String] = CommandLine.arguments) async throws {
+        if arguments.contains("--request-permission") {
+            print(CGRequestScreenCaptureAccess() ? "화면 기록 권한 허용됨" : "화면 기록 권한이 필요합니다. 시스템 설정에서 녹화 도구를 허용해주세요.")
+            return
+        }
         let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
         let windows = content.windows.filter { $0.owningApplication?.bundleIdentifier == "com.cg1119.p2j.demo" }
-        if CommandLine.arguments.count < 3 {
+        if arguments.count < 3 {
             for w in windows { print("\(w.windowID) \(w.title ?? "") \(w.frame)") }
             return
         }
-        let id = UInt32(CommandLine.arguments[1])!
+        let id = arguments[1] == "auto" ? windows.filter { $0.title == "P2J" }.max(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height })?.windowID : UInt32(arguments[1])
         guard let window = windows.first(where: { $0.windowID == id }),
               let app = window.owningApplication,
               let display = content.displays.first(where: { $0.frame.intersects(window.frame) }) else {
             throw NSError(domain: "P2JDemoWindowNotFound", code: 1)
         }
-        let destination = URL(fileURLWithPath: CommandLine.arguments[2])
+        let destination = URL(fileURLWithPath: arguments[2])
         guard !FileManager.default.fileExists(atPath: destination.path) else {
             throw NSError(domain: "OutputAlreadyExists", code: 2)
         }
