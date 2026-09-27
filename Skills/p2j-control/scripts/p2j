@@ -3,6 +3,7 @@
 import argparse
 import base64
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -13,17 +14,45 @@ import uuid
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('operation', choices=['list', 'stats', 'add', 'update', 'start', 'complete', 'subtask', 'timing'])
+    parser.add_argument('operation', choices=['doctor', 'list', 'stats', 'add', 'update', 'start', 'complete', 'subtask', 'timing'])
     parser.add_argument('--json', help='요청 필드 JSON. 생략하면 빈 객체, - 이면 stdin에서 읽음')
-    parser.add_argument('--app', help='실행할 P2J.app 경로. 생략하면 설치된 P2J URL 핸들러 사용')
+    parser.add_argument('--app', default=os.environ.get('P2J_APP'), help='실행할 P2J.app 경로. 생략하면 설치된 P2J URL 핸들러 사용')
     parser.add_argument('--request-id', help='재시도 시 기존 UUID 재사용')
-    parser.add_argument('--response-dir', type=pathlib.Path, help='앱의 automation 응답 폴더를 명시')
+    parser.add_argument('--response-dir', type=pathlib.Path, default=os.environ.get('P2J_RESPONSE_DIR'), help='앱의 automation 응답 폴더를 명시')
     parser.add_argument('--dry-run', action='store_true', help='앱에 전송하지 않고 요청만 출력')
+    parser.add_argument('--timeout', type=float, default=20, help='응답 대기 시간(초), 0 초과 120 이하')
     args = parser.parse_args()
+    if args.app:
+        args.app = str(pathlib.Path(args.app).expanduser().resolve())
+    if not 0 < args.timeout <= 120:
+        raise ValueError('timeout은 0 초과 120 이하입니다.')
+    roots = [args.response_dir] if args.response_dir else [
+        pathlib.Path.home() / 'Library/Application Support/TODOFirst/automation',
+        pathlib.Path.home() / 'Library/Containers/com.cg1119.todofirst.TODOFirst/Data/Library/Application Support/TODOFirst/automation',
+    ]
+    if args.operation == 'doctor':
+        ready = [root for root in roots if (root.parent / 'automation-token').is_file()]
+        app_ok = args.app is None or pathlib.Path(args.app).is_dir()
+        ok = len(ready) == 1 and app_ok
+        print(json.dumps({'ok': ok, 'data': {'app': args.app, 'appPathExists': app_ok,
+            'responseDirectories': [str(root) for root in roots], 'tokenStoresFound': len(ready),
+            'message': '로컬 준비 상태 확인 완료. 실제 연결은 list로 확인하세요.' if ok else
+                '최신 앱을 실행하고 --app 및 --response-dir를 확인하세요.'}}, ensure_ascii=False))
+        return 0 if ok else 1
     fields = json.loads(sys.stdin.read() if args.json == '-' else args.json or '{}')
     if not isinstance(fields, dict):
         raise ValueError('요청은 JSON 객체여야 합니다.')
     request_id = str(uuid.UUID(args.request_id)) if args.request_id else str(uuid.uuid4())
+    allowed = {
+        'list': set(), 'stats': {'days'},
+        'add': {'title', 'note', 'rule', 'startDate', 'endDate', 'priority', 'subtasks'},
+        'update': {'taskID', 'title', 'note', 'rule', 'startDate', 'endDate', 'priority'},
+        'start': {'taskID'}, 'complete': {'taskID', 'completed'},
+        'subtask': {'taskID', 'subtaskID', 'completed'},
+        'timing': {'taskID', 'workday', 'startedAt', 'finishedAt'},
+    }
+    if fields.keys() - allowed[args.operation]:
+        raise ValueError('이 명령에서 지원하지 않는 필드가 있습니다. references/commands.md를 확인하세요.')
     fields.update(id=request_id, operation=args.operation)
     data = json.dumps(fields, ensure_ascii=False).encode()
     if len(data) > 60000:
@@ -31,10 +60,6 @@ def main():
     if args.dry_run:
         print(data.decode())
         return 0
-    roots = [args.response_dir] if args.response_dir else [
-        pathlib.Path.home() / 'Library/Application Support/TODOFirst/automation',
-        pathlib.Path.home() / 'Library/Containers/com.cg1119.todofirst.TODOFirst/Data/Library/Application Support/TODOFirst/automation',
-    ]
     files = [root / (request_id + '.json') for root in roots]
     tokens = [root.parent / 'automation-token' for root in roots]
     found_tokens = [file for file in tokens if file.exists()]
@@ -50,8 +75,12 @@ def main():
         command = ['open', '-g']
         if args.app:
             command += ['-a', args.app]
-        subprocess.run(command + [url], check=True, capture_output=True)
-    deadline = time.monotonic() + 20
+        try:
+            subprocess.run(command + [url], check=True, capture_output=True)
+        except subprocess.SubprocessError:
+            # CalledProcessError 문자열에는 토큰이 포함된 URL이 들어 있으므로 출력하지 않습니다.
+            raise ValueError('P2J 앱을 열지 못했습니다. --app 경로와 앱 설치 상태를 확인하세요.') from None
+    deadline = time.monotonic() + args.timeout
     while time.monotonic() < deadline:
         for file in files:
             if file.exists():

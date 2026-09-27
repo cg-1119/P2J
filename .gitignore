@@ -23,3 +23,7 @@ xcuserdata/
 
 # Personal signing configuration
 Configuration/Local.xcconfig
+
+# Python tool validation
+__pycache__/
+*.pyc

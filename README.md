@@ -15,6 +15,7 @@
   <a href="#시작하기">시작하기</a> ·
   <a href="#이렇게-사용하세요">사용 방법</a> ·
   <a href="#일반-모드와-상세-기록-모드">기록 모드</a> ·
+  <a href="#codexclaude-code로-할-일-관리">AI 스킬</a> ·
   <a href="#자주-묻는-질문">자주 묻는 질문</a> ·
   <a href="https://github.com/cg-1119/P2J/issues">버그 제보</a>
 </p>
@@ -177,15 +178,46 @@ Mac의 현지 시각을 기준으로 **오전 6시부터 다음 날 오전 5시 
 
 [GitHub Issues](https://github.com/cg-1119/P2J/issues)에 **macOS 버전, 앱 버전 또는 커밋, 재현 순서, 기대한 동작과 실제 동작**을 적어주세요. 특히 멈춤 문제는 메뉴 막대에서 열었는지, 어떤 버튼을 누른 직후인지 함께 알려주시면 도움이 됩니다.
 
-## 개발 및 자동화
+## Codex·Claude Code로 할 일 관리
 
-앱은 SwiftUI와 AppKit, 메뉴 막대는 MenuBarExtra, 위젯은 WidgetKit으로 구현합니다. 일정·완료·통계 로직의 테스트 소스도 [Tests](Tests/TODOFirstCoreTests)에 공개하며, 배포용 앱 타깃과 분리돼 있습니다.
+대화로 P2J에 할 일을 등록하거나 완료 기록을 확인할 수 있습니다. **P2J가 실행되는 같은 Mac의 로컬 Codex·Claude Code**에서 사용하는 스킬입니다. 웹 채팅만으로 연결하는 기능은 아닙니다.
+
+저장소 루트에서 설치하세요. Python 3이 필요합니다.
+
+```sh
+python3 Tools/install-skill both
+# Codex만: python3 Tools/install-skill codex
+# Claude Code만: python3 Tools/install-skill claude
+```
+
+이미 설치했다면 `--replace`를 붙여 업데이트합니다. 기존 설치본은 백업합니다. 새 세션에서 다음처럼 요청해보세요.
+
+**Codex**
+
+```text
+$p2j-control 매일 할 일로 영어 공부 20분을 등록해줘. 우선순위는 보통으로.
+```
+
+**Claude Code**
+
+```text
+/p2j-control 오늘 할 일을 보여주고, 영어 공부의 시작을 기록해줘.
+```
+
+두 도구에서 조회·등록·수정·하위 체크·시작·완료·시간 기록·통계를 사용할 수 있습니다. 저장소 안에서 작업하는 경우에는 프로젝트 스킬이 포함돼 있어 별도 개인 설치 없이도 발견할 수 있습니다.
+
+스킬은 `SKILL.md`와 실제 실행 스크립트, 요청 규격, Codex용 UI 메타데이터로 구성됩니다. CLI가 저장 파일을 직접 수정하는 대신 앱을 통해 처리하며, 상세 모드의 시작·종료 규칙도 그대로 적용합니다. AI에 조회한 내용은 해당 AI 서비스에서 처리될 수 있습니다.
+
+설치 위치, 연결 진단, 사용 예시와 지원 범위는 [Codex·Claude Code 사용 안내](docs/AI_TOOLS.md)를 참고하세요.
+
+## 개발 및 테스트
+
+앱은 SwiftUI와 AppKit, 메뉴 막대는 MenuBarExtra, 위젯은 WidgetKit으로 구현합니다. [테스트 소스](Tests)는 앱 타깃과 분리해 공개합니다.
 
 ```sh
 swift test
+python3 -m unittest discover -s Tests/ToolTests -v
 ```
-
-로컬 JSON 도구와 **p2j-control** 스킬로 AI가 할 일을 조회·등록·수정하고 시작·완료 기록을 처리할 수도 있습니다. 사용 방법과 준비 사항은 [AI 도구 안내](docs/AI_TOOLS.md)를 참고하세요.
 
 - [개발 가이드](docs/DEVELOPMENT.md) — 빌드, 서명, 저장 구조와 테스트
 - [위젯 가이드](docs/WIDGETS.md) — App Group 설정과 검증 상태

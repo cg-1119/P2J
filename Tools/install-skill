@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+"""Codex/Claude Code 개인 스킬 폴더에 독립 실행 가능한 P2J 스킬을 설치합니다."""
+import argparse
+import datetime
+import pathlib
+import shutil
+import sys
+
+SOURCE = pathlib.Path(__file__).resolve().parents[1] / 'Skills/p2j-control'
+
+def install(source, parent, replace=False):
+    target = parent / 'p2j-control'
+    parent.mkdir(parents=True, exist_ok=True)
+    if target.exists() or target.is_symlink():
+        if not replace:
+            raise ValueError(f'이미 설치되어 있습니다: {target}. 백업 후 교체하려면 --replace를 사용하세요.')
+        stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')
+        backup = parent.parent / 'p2j-skill-backups' / stamp
+        backup.parent.mkdir(parents=True, exist_ok=True)
+        target.rename(backup)
+        print(f'기존 스킬 백업: {backup}')
+    shutil.copytree(source, target, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+    print(f'설치 완료: {target}')
+    return target
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('target', choices=['codex','claude','both'])
+    parser.add_argument('--replace', action='store_true')
+    parser.add_argument('--home', type=pathlib.Path, default=pathlib.Path.home(), help='설치 홈(격리 테스트용 지정 가능)')
+    args = parser.parse_args()
+    parents = []
+    if args.target in ['codex','both']:
+        # 이 Mac처럼 기존 Codex 스킬 경로를 사용하는 환경은 중복 설치하지 않습니다.
+        legacy = args.home / '.codex/skills'
+        parents.append(legacy if (legacy/'p2j-control').exists() else args.home/'.agents/skills')
+    if args.target in ['claude','both']:
+        parents.append(args.home/'.claude/skills')
+    # 한쪽 충돌 때문에 다른 쪽만 설치되는 일을 피합니다.
+    for parent in parents:
+        target = parent/'p2j-control'
+        if (target.exists() or target.is_symlink()) and not args.replace:
+            raise ValueError(f'이미 설치되어 있습니다: {target}. --replace로 백업 후 교체할 수 있습니다.')
+    for parent in parents: install(SOURCE, parent, args.replace)
+    print('새 Codex/Claude Code 세션에서 p2j-control을 확인하세요.')
+
+if __name__ == '__main__':
+    try: main()
+    except (ValueError, OSError) as error:
+        print(str(error), file=sys.stderr); sys.exit(1)
