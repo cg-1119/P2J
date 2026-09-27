@@ -225,7 +225,7 @@ private struct TaskRow: View {
                 }
             }
             Spacer(minLength: 8)
-            TaskPriorityPicker(title: item.title, priority: Binding(get: { item.priority }, set: onPriority))
+            TaskPriorityPicker(title: item.title, priority: item.priority, onSelect: onPriority)
             Button(action: onEdit) { Image(systemName: "pencil") }
                 .buttonStyle(.borderless)
                 .foregroundStyle(.secondary)

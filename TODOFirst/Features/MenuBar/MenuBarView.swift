@@ -73,9 +73,9 @@ struct MenuBarView: View {
                                     }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                TaskPriorityPicker(title: item.title, priority: Binding(
-                                    get: { item.priority }, set: { store.setPriority($0, for: item) }
-                                ))
+                                TaskPriorityPicker(title: item.title, priority: item.priority) {
+                                    store.setPriority($0, for: item)
+                                }
                                 .controlSize(.small)
                             }
                             .disabled(!store.isReady)
