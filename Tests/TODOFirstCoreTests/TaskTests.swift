@@ -774,15 +774,33 @@ final class TaskTests: XCTestCase {
         archived.archivedOn = TaskDay(date(23), calendar: calendar)
         let records = [once, period, daily, future, overdue, unfinishedPeriod, archived]
         let visible = TodoItem.overviewItems(records, on: date(24), includeCompleted: false, calendar: calendar)
-        XCTAssertEqual(Set(visible.map(\.id)), Set([daily, future, overdue, unfinishedPeriod].map(\.id)))
+        XCTAssertEqual(Set(visible.map(\.id)), Set([daily, future].map(\.id)))
         let all = TodoItem.overviewItems(records, on: date(24), includeCompleted: true, calendar: calendar)
-        XCTAssertEqual(Set(all.map(\.id)), Set(records.filter { $0.archivedOn == nil }.map(\.id)))
-        // 과거 하루 작업을 오늘 미완료로 오판해 위로 올리지 않습니다.
-        XCTAssertTrue(all.prefix(3).allSatisfy { !$0.isFinished && !$0.isCompleted(on: date(24), calendar: calendar) })
+        XCTAssertEqual(Set(all.map(\.id)), Set([daily, future].map(\.id)))
+        // 지난 완료 기록은 숨기되 저장된 기록은 유지합니다.
+        XCTAssertEqual(all.first?.id, future.id)
         XCTAssertEqual(once.completedDays, [TaskDay(date(21), calendar: calendar)])
         XCTAssertTrue(once.isFinished)
         XCTAssertTrue(period.isFinished)
         XCTAssertFalse(daily.isFinished)
+    }
+
+    func testOverviewExpiresAtSixAMRegardlessOfCompletionFilter() {
+        let once = item(.once)
+        let period = TodoItem(title: "기간", repeatRule: .period, startDate: date(20), endDate: date(21), calendar: calendar)
+        var finished = item(.once)
+        finished.completedDays = [TaskDay(date(21), calendar: calendar)]
+        let ongoing = TodoItem(title: "진행 중", repeatRule: .period, startDate: date(20), endDate: date(23), calendar: calendar)
+        let weekly = item(.weekly)
+        let records = [once, period, finished, ongoing, weekly]
+        let before = TaskClock.dayDate(for: date(22, hour: 5), calendar: calendar)
+        let after = TaskClock.dayDate(for: date(22, hour: 6), calendar: calendar)
+        for includeCompleted in [false, true] {
+            let early = TodoItem.overviewItems(records, on: before, includeCompleted: includeCompleted, calendar: calendar)
+            XCTAssertEqual(Set(early.map(\.id)), Set(([once, period, ongoing, weekly] + (includeCompleted ? [finished] : [])).map(\.id)))
+            let late = TodoItem.overviewItems(records, on: after, includeCompleted: includeCompleted, calendar: calendar)
+            XCTAssertEqual(Set(late.map(\.id)), Set([ongoing, weekly].map(\.id)))
+        }
     }
 
     func testOverdueStartsAtSixAMAfterDeadlineAndExcludesFinishedOrRepeatingTasks() {

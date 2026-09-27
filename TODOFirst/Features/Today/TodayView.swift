@@ -176,7 +176,7 @@ struct TodayView: View {
         switch filter {
         case .today: "오늘 할 일을 등록해보세요"
         case .recurring: "꾸준히 하고 싶은 일이 있나요?"
-        case .all: includeCompleted ? "아직 등록한 할 일이 없어요" : "남아 있는 할 일이 없어요"
+        case .all: includeCompleted ? "표시할 일정이 없어요" : "남아 있는 할 일이 없어요"
         case .statistics: "통계"
         }
     }
@@ -185,7 +185,7 @@ struct TodayView: View {
         switch filter {
         case .today: "오늘 하루만 할 일도, 매일의 작은 습관도 좋아요."
         case .recurring: "매일·매주 반복할 일을 한 번만 등록하세요."
-        case .all: includeCompleted ? "할 일 추가 버튼이나 ⌘N으로 시작하세요." : "완료 포함을 켜서 끝낸 작업을 확인하거나 새 할 일을 등록하세요."
+        case .all: includeCompleted ? "지난 일정은 숨겨져요. 새 할 일을 등록해보세요." : "날짜가 지나지 않은 완료 작업은 완료 포함을 켜서 확인하세요."
         case .statistics: "오늘의 기록을 확인하세요."
         }
     }

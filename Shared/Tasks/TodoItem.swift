@@ -188,10 +188,18 @@ struct TodoItem: Codable, Identifiable, Equatable, Sendable {
         return deadline.map { $0 < TaskDay(workday, calendar: calendar) } ?? false
     }
 
-    /// 전체 목록은 끝난 단발 작업만 숨깁니다. 과거 미완료와 미래 일정은 유지합니다.
+    /// 전체 목록은 기한이 지난 단발 작업을 완료 여부와 관계없이 숨깁니다.
     static func overviewItems(_ items: [TodoItem], on workday: Date, includeCompleted: Bool,
                               calendar: Calendar = .current) -> [TodoItem] {
-        let visible = items.filter { $0.archivedOn == nil && (includeCompleted || !$0.isFinished) }
+        let day = TaskDay(workday, calendar: calendar)
+        let visible = items.filter { item in
+            guard item.archivedOn == nil, includeCompleted || !item.isFinished else { return false }
+            switch item.repeatRule {
+            case .once: return item.startDay >= day
+            case .period: return item.endDay.map { $0 >= day } ?? false
+            default: return true
+            }
+        }
         return visible.sorted { lhs, rhs in
             let leftDone = lhs.isFinished || lhs.isCompleted(on: workday, calendar: calendar)
             let rightDone = rhs.isFinished || rhs.isCompleted(on: workday, calendar: calendar)
