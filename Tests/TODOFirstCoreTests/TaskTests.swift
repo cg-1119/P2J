@@ -760,4 +760,51 @@ final class TaskTests: XCTestCase {
         }
     }
 
+    func testOverviewHidesFinishedFiniteTasksButKeepsRecurringAndFutureTasks() {
+        var once = item(.once)
+        once.completedDays = [TaskDay(date(21), calendar: calendar)]
+        var period = TodoItem(title: "완료한 기간 작업", repeatRule: .period, startDate: date(21), endDate: date(23), calendar: calendar)
+        period.completedDays = [TaskDay(date(22), calendar: calendar)]
+        var daily = item(.daily)
+        daily.completedDays = [TaskDay(date(24), calendar: calendar)]
+        let future = item(.once, day: 26)
+        let overdue = item(.once, day: 22)
+        let unfinishedPeriod = TodoItem(title: "미완료 기간 작업", repeatRule: .period, startDate: date(21), endDate: date(23), calendar: calendar)
+        var archived = item(.daily)
+        archived.archivedOn = TaskDay(date(23), calendar: calendar)
+        let records = [once, period, daily, future, overdue, unfinishedPeriod, archived]
+        let visible = TodoItem.overviewItems(records, on: date(24), includeCompleted: false, calendar: calendar)
+        XCTAssertEqual(Set(visible.map(\.id)), Set([daily, future, overdue, unfinishedPeriod].map(\.id)))
+        let all = TodoItem.overviewItems(records, on: date(24), includeCompleted: true, calendar: calendar)
+        XCTAssertEqual(Set(all.map(\.id)), Set(records.filter { $0.archivedOn == nil }.map(\.id)))
+        // 과거 하루 작업을 오늘 미완료로 오판해 위로 올리지 않습니다.
+        XCTAssertTrue(all.prefix(3).allSatisfy { !$0.isFinished && !$0.isCompleted(on: date(24), calendar: calendar) })
+        XCTAssertEqual(once.completedDays, [TaskDay(date(21), calendar: calendar)])
+        XCTAssertTrue(once.isFinished)
+        XCTAssertTrue(period.isFinished)
+        XCTAssertFalse(daily.isFinished)
+    }
+
+    func testOverdueStartsAtSixAMAfterDeadlineAndExcludesFinishedOrRepeatingTasks() {
+        var once = item(.once)
+        var period = TodoItem(title: "기간 작업", repeatRule: .period, startDate: date(20), endDate: date(21), calendar: calendar)
+        let before = TaskClock.dayDate(for: date(22, hour: 5), calendar: calendar)
+        let after = TaskClock.dayDate(for: date(22, hour: 6), calendar: calendar)
+        XCTAssertFalse(once.isOverdue(on: before, calendar: calendar))
+        XCTAssertFalse(period.isOverdue(on: before, calendar: calendar))
+        XCTAssertTrue(once.isOverdue(on: after, calendar: calendar))
+        XCTAssertTrue(period.isOverdue(on: after, calendar: calendar))
+        XCTAssertFalse(item(.once, day: 23).isOverdue(on: after, calendar: calendar))
+        for rule in [TaskRepeat.daily, .weekly, .weekdays] {
+            XCTAssertFalse(item(rule).isOverdue(on: after, calendar: calendar))
+        }
+        once.completedDays = [TaskDay(date(21), calendar: calendar)]
+        period.completedDays = [TaskDay(date(21), calendar: calendar)]
+        XCTAssertFalse(once.isOverdue(on: after, calendar: calendar))
+        XCTAssertFalse(period.isOverdue(on: after, calendar: calendar))
+        var archived = item(.once)
+        archived.archivedOn = TaskDay(date(21), calendar: calendar)
+        XCTAssertFalse(archived.isOverdue(on: after, calendar: calendar))
+    }
+
 }

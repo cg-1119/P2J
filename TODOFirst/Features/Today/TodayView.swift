@@ -23,6 +23,7 @@ struct TodayView: View {
     @Environment(TaskStore.self) private var store
     @Environment(\.openWindow) private var openWindow
     @State private var filter: TaskFilter = .today
+    @State private var includeCompleted = false
     @State private var editor: TaskEditorRoute?
     @State private var pendingDeletion: TodoItem?
 
@@ -92,6 +93,12 @@ struct TodayView: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .frame(maxWidth: 340)
+                if filter == .all {
+                    Toggle("완료 포함", isOn: $includeCompleted)
+                        .toggleStyle(.checkbox)
+                    Text("완료한 하루·기간 작업은 기본적으로 숨겨요. 기한이 지난 미완료 작업은 남겨둡니다.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if store.recordingMode == .detailed {
                     Text("시작 → 종료를 직접 기록해요. 오전 6시가 지나도 종료하지 않으면 미완료예요.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -151,6 +158,9 @@ struct TodayView: View {
     }
 
     private func filtered(on date: Date) -> [TodoItem] {
+        if filter == .all {
+            return TodoItem.overviewItems(store.items, on: date, includeCompleted: includeCompleted)
+        }
         let items = store.items.filter { item in
             switch filter {
             case .today: item.occurs(on: date)
@@ -166,7 +176,7 @@ struct TodayView: View {
         switch filter {
         case .today: "오늘 할 일을 등록해보세요"
         case .recurring: "꾸준히 하고 싶은 일이 있나요?"
-        case .all: "아직 등록한 할 일이 없어요"
+        case .all: includeCompleted ? "아직 등록한 할 일이 없어요" : "남아 있는 할 일이 없어요"
         case .statistics: "통계"
         }
     }
@@ -175,7 +185,7 @@ struct TodayView: View {
         switch filter {
         case .today: "오늘 하루만 할 일도, 매일의 작은 습관도 좋아요."
         case .recurring: "매일·매주 반복할 일을 한 번만 등록하세요."
-        case .all: "할 일 추가 버튼이나 ⌘N으로 시작하세요."
+        case .all: includeCompleted ? "할 일 추가 버튼이나 ⌘N으로 시작하세요." : "완료 포함을 켜서 끝낸 작업을 확인하거나 새 할 일을 등록하세요."
         case .statistics: "오늘의 기록을 확인하세요."
         }
     }
@@ -189,14 +199,23 @@ private struct TaskRow: View {
     let onEdit: () -> Void
     let onDelete: () -> Void
 
+    private var recordDate: Date {
+        item.repeatRule == .once ? (item.startDay.date() ?? date) : date
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            TaskCompletionControl(item: item, date: date)
+            TaskCompletionControl(item: item, date: recordDate)
+                .disabled(!item.occurs(on: date))
                 .padding(.top, 3)
             VStack(alignment: .leading, spacing: 5) {
                 Text(item.title).font(.headline)
-                    .strikethrough(item.isCompleted(on: date))
-                    .foregroundStyle(item.isCompleted(on: date) ? .secondary : .primary)
+                    .strikethrough(item.isCompleted(on: recordDate))
+                    .foregroundStyle(item.isCompleted(on: recordDate) ? .secondary : .primary)
+                if item.isOverdue(on: date) {
+                    Label("기한 지남", systemImage: "exclamationmark.circle")
+                        .font(.caption.weight(.medium)).foregroundStyle(.orange)
+                }
                 if !item.note.isEmpty {
                     Text(item.note).font(.callout).foregroundStyle(.secondary)
                         .lineLimit(2).help(item.note)
@@ -213,10 +232,13 @@ private struct TaskRow: View {
                 if let end = item.endDay?.date(), item.repeatRule == .period {
                     Text("종료: \(end.formatted(date: .abbreviated, time: .omitted))").font(.caption).foregroundStyle(.secondary)
                 }
-                if store.recordingMode == .detailed { TaskTimingView(item: item, date: date) }
+                if store.recordingMode == .detailed {
+                    TaskTimingView(item: item, date: recordDate)
+                        .disabled(!item.occurs(on: date))
+                }
                 ForEach(item.subtasks) { subtask in
                     Toggle(isOn: Binding(get: {
-                        item.isSubtaskCompleted(subtask, on: date)
+                        item.isSubtaskCompleted(subtask, on: recordDate)
                     }, set: { store.setSubtaskCompletion($0, id: subtask.id, in: item) })) {
                         Text(subtask.title).font(.callout)
                     }
@@ -367,11 +389,11 @@ struct TaskCompletionControl: View {
                 .accessibilityLabel(item.isCompleted(on: date) ? "완료" : "미완료")
         } else {
             Toggle(isOn: Binding(get: { item.isCompleted(on: date) }, set: { store.setCompletion($0, for: item) })) {
-                Text("\(item.title) 오늘 완료")
+                Text("\(item.title) \(TaskDay(date) == TaskDay(store.workday) ? "오늘 완료" : "완료")")
             }
             .labelsHidden().toggleStyle(.checkbox)
-            .disabled(!item.occurs(on: date))
-            .help(item.occurs(on: date) ? "오늘 완료 표시 또는 취소" : "오늘 해당하지 않는 일정입니다")
+            .disabled(!item.occurs(on: store.workday))
+            .help(item.occurs(on: store.workday) ? "오늘 완료 표시 또는 취소" : "오늘 해당하지 않는 일정입니다")
         }
     }
 }

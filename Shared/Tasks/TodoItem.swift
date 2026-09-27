@@ -168,6 +168,40 @@ struct TodoItem: Codable, Identifiable, Equatable, Sendable {
         }
     }
 
+    /// 반복 일정은 특정 날짜를 완료해도 일정 자체가 끝나지 않습니다.
+    var isFinished: Bool {
+        switch repeatRule {
+        case .once: completedDays.contains(startDay)
+        case .period: !completedDays.isEmpty
+        default: false
+        }
+    }
+
+    func isOverdue(on workday: Date, calendar: Calendar = .current) -> Bool {
+        guard archivedOn == nil, !isFinished else { return false }
+        let deadline: TaskDay?
+        switch repeatRule {
+        case .once: deadline = startDay
+        case .period: deadline = endDay
+        default: deadline = nil
+        }
+        return deadline.map { $0 < TaskDay(workday, calendar: calendar) } ?? false
+    }
+
+    /// 전체 목록은 끝난 단발 작업만 숨깁니다. 과거 미완료와 미래 일정은 유지합니다.
+    static func overviewItems(_ items: [TodoItem], on workday: Date, includeCompleted: Bool,
+                              calendar: Calendar = .current) -> [TodoItem] {
+        let visible = items.filter { $0.archivedOn == nil && (includeCompleted || !$0.isFinished) }
+        return visible.sorted { lhs, rhs in
+            let leftDone = lhs.isFinished || lhs.isCompleted(on: workday, calendar: calendar)
+            let rightDone = rhs.isFinished || rhs.isCompleted(on: workday, calendar: calendar)
+            if leftDone != rightDone { return !leftDone }
+            if lhs.priority != rhs.priority { return lhs.priority.rawValue < rhs.priority.rawValue }
+            if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+    }
+
     func activity(on date: Date, calendar: Calendar = .current) -> TaskActivity? {
         if repeatRule == .period { return activities.last }
         return activities.last { $0.day == TaskDay(date, calendar: calendar) }
