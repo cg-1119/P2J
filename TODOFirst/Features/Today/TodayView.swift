@@ -96,7 +96,7 @@ struct TodayView: View {
                 if filter == .all {
                     Toggle("완료 포함", isOn: $includeCompleted)
                         .toggleStyle(.checkbox)
-                    Text("완료한 하루·기간 작업은 기본적으로 숨겨요. 기한이 지난 미완료 작업은 남겨둡니다.")
+                    Text("지난 하루·기간 작업은 숨겨요. 반복 일정과 앞으로의 일정은 계속 표시합니다.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if store.recordingMode == .detailed {
