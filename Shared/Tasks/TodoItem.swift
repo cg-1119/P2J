@@ -85,6 +85,12 @@ enum TaskPriority: Int, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+enum TaskRecordingMode: String, Codable, CaseIterable, Identifiable, Sendable {
+    case normal, detailed
+    var id: String { rawValue }
+    var title: String { self == .normal ? "일반 모드" : "상세 기록 모드" }
+}
+
 struct Subtask: Codable, Identifiable, Equatable, Sendable {
     var id: UUID = UUID()
     var title: String

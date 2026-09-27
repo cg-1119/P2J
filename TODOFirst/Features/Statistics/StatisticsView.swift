@@ -127,7 +127,7 @@ struct StatisticsView: View {
                             Image(systemName: entry.completed ? "checkmark.circle.fill" : "play.circle.fill").foregroundStyle(.teal)
                             Text(entry.title).font(.headline).textSelection(.enabled)
                             Spacer()
-                            Text(entry.completed ? "완료" : "시작 기록").font(.caption).foregroundStyle(.secondary)
+                            Text(entry.completed ? "완료" : "미완료 · 종료 미기록").font(.caption).foregroundStyle(.secondary)
                         }
                         if let workday = entry.day.date() {
                             Text("작업일 \(workday.formatted(date: .abbreviated, time: .omitted)) · 우선순위 \(entry.priority.title)")

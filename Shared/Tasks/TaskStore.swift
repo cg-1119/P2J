@@ -7,10 +7,14 @@ final class TaskStore {
     var items: [TodoItem] { records.filter { $0.archivedOn == nil } }
     private(set) var errorMessage: String?
     private(set) var isReady = false
+    private(set) var recordingMode: TaskRecordingMode
+    private let preferences: UserDefaults?
     private let repository: TaskRepository?
     private let didChange: ([TodoItem]) -> Void
 
-    init(repository: TaskRepository? = nil, didChange: @escaping ([TodoItem]) -> Void = { _ in }) {
+    init(repository: TaskRepository? = nil, preferences: UserDefaults? = nil, didChange: @escaping ([TodoItem]) -> Void = { _ in }) {
+        self.preferences = preferences
+        recordingMode = preferences?.string(forKey: "recordingMode").flatMap(TaskRecordingMode.init(rawValue:)) ?? .normal
         self.didChange = didChange
         do {
             self.repository = try repository ?? TaskRepository.local()
@@ -19,6 +23,12 @@ final class TaskStore {
             self.errorMessage = error.localizedDescription
         }
         reload()
+    }
+
+    func setRecordingMode(_ mode: TaskRecordingMode) {
+        recordingMode = mode
+        preferences?.set(mode.rawValue, forKey: "recordingMode")
+        errorMessage = nil
     }
 
     func reload() {
@@ -56,6 +66,12 @@ final class TaskStore {
         var next = records
         let day = TaskDay(date, calendar: calendar)
         let undo = next[index].isCompleted(on: date, calendar: calendar)
+        if !undo && recordingMode == .detailed {
+            guard let start = next[index].activity(on: date, calendar: calendar)?.startedAt, start <= instant else {
+                errorMessage = "상세 기록 모드는 시작을 누른 뒤 종료해주세요."
+                return false
+            }
+        }
         if next[index].repeatRule == .period {
             if undo { next[index].completedDays.removeAll() }
             else { next[index].completedDays = [day] }
@@ -97,6 +113,10 @@ final class TaskStore {
         guard let index = records.firstIndex(where: { $0.id == item.id && $0.archivedOn == nil }) else { return false }
         let current = records[index]
         let day = TaskDay(workday, calendar: calendar)
+        if recordingMode == .detailed && finishedAt != nil && startedAt == nil {
+            errorMessage = "상세 기록 모드는 시작 시각과 종료 시각을 함께 기록해주세요."
+            return false
+        }
         guard current.occurs(on: workday, calendar: calendar),
               startedAt != nil || finishedAt != nil,
               startedAt.map({ $0 <= now }) ?? true, finishedAt.map({ $0 <= now }) ?? true,

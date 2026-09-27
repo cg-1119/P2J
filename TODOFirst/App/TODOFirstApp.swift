@@ -11,7 +11,7 @@ struct TODOFirstApp: App {
         try? TaskAutomation.prepare()
         let sync = WidgetSync()
         _widgetSync = State(initialValue: sync)
-        _taskStore = State(initialValue: TaskStore(didChange: { sync.publish($0) }))
+        _taskStore = State(initialValue: TaskStore(preferences: .standard, didChange: { sync.publish($0) }))
     }
 
     var body: some Scene {

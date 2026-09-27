@@ -23,6 +23,7 @@ struct MenuBarView: View {
                 Text(date, format: .dateTime.month().day().weekday())
                     .font(.caption).foregroundStyle(.secondary)
             }
+            TaskRecordingModePicker()
             HStack {
                 Text("오늘 할 일").font(.subheadline.bold())
                 Spacer()
@@ -46,12 +47,8 @@ struct MenuBarView: View {
                     LazyVStack(alignment: .leading, spacing: 12) {
                         ForEach(tasks) { item in
                             HStack(alignment: .top, spacing: 10) {
-                                Toggle(isOn: Binding(
-                                    get: { item.isCompleted(on: date) },
-                                    set: { _ in store.toggleCompletion(item) }
-                                )) { Text("\(item.title) 오늘 완료") }
-                                .labelsHidden().toggleStyle(.checkbox)
-                                .padding(.top, 2)
+                                TaskCompletionControl(item: item, date: date)
+                                    .padding(.top, 2)
                                 VStack(alignment: .leading, spacing: 5) {
                                     Text(item.title).font(.callout.weight(.medium)).lineLimit(2)
                                         .strikethrough(item.isCompleted(on: date))

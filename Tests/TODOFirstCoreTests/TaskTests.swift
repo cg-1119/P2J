@@ -579,4 +579,99 @@ final class TaskTests: XCTestCase {
         XCTAssertEqual(store.items.count, 1)
     }
 
+    @MainActor func testDetailedModeRequiresExplicitStartAndFinish() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let store = TaskStore(repository: repo)
+        let task = item(.daily)
+        XCTAssertTrue(store.add(task))
+        store.setRecordingMode(.detailed)
+        XCTAssertFalse(store.toggleCompletion(task, on: date(21), calendar: calendar))
+        XCTAssertTrue(store.items[0].activities.isEmpty)
+        XCTAssertFalse(store.recordTiming(task, workday: date(21), startedAt: nil, finishedAt: date(21), now: date(22), calendar: calendar))
+        XCTAssertTrue(store.start(task, on: date(21, hour: 23), calendar: calendar))
+        XCTAssertFalse(store.items[0].isCompleted(on: date(21), calendar: calendar))
+        XCTAssertTrue(store.toggleCompletion(task, on: date(22, hour: 5), calendar: calendar))
+        XCTAssertEqual(store.items[0].activities[0].elapsed, 6 * 3600)
+        XCTAssertTrue(store.items[0].isCompleted(on: date(21), calendar: calendar))
+        XCTAssertTrue(store.toggleCompletion(task, on: date(22, hour: 5), calendar: calendar))
+        XCTAssertNil(store.items[0].activities[0].finishedAt)
+        XCTAssertFalse(store.items[0].isCompleted(on: date(21), calendar: calendar))
+    }
+
+    @MainActor func testDetailedUnfinishedDailyRecordRemainsIncompleteAfterSixAM() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let store = TaskStore(repository: repo)
+        let task = item(.daily)
+        XCTAssertTrue(store.add(task))
+        store.setRecordingMode(.detailed)
+        XCTAssertTrue(store.start(task, on: date(21, hour: 23), calendar: calendar))
+        XCTAssertFalse(store.toggleCompletion(task, on: date(22, hour: 6), calendar: calendar))
+        XCTAssertTrue(store.start(task, on: date(22, hour: 6), calendar: calendar))
+        XCTAssertTrue(store.toggleCompletion(task, on: date(22, hour: 7), calendar: calendar))
+        XCTAssertFalse(store.items[0].isCompleted(on: date(21), calendar: calendar))
+        XCTAssertTrue(store.items[0].isCompleted(on: date(22), calendar: calendar))
+        let logs = TaskStatistics.logs(2, through: date(22), records: store.records, calendar: calendar)
+        XCTAssertEqual(logs.filter(\.completed).count, 1)
+        XCTAssertEqual(logs.filter(\.completed).compactMap(\.elapsed).reduce(0, +), 3600)
+        XCTAssertNil(logs.first { !$0.completed }?.finishedAt)
+        XCTAssertEqual(TaskStatistics.summary(2, through: date(22), records: store.records, calendar: calendar).recurringCompleted, 1)
+        XCTAssertEqual(try repo.load(), store.records)
+    }
+
+    @MainActor func testDetailedPeriodRemainsOpenUntilExplicitFinish() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let store = TaskStore(repository: repo)
+        let task = TodoItem(title: "기간", repeatRule: .period, startDate: date(21), endDate: date(25), calendar: calendar)
+        XCTAssertTrue(store.add(task))
+        store.setRecordingMode(.detailed)
+        XCTAssertTrue(store.start(task, on: date(21, hour: 23), calendar: calendar))
+        store.reload()
+        XCTAssertFalse(store.items[0].isCompleted(on: date(22), calendar: calendar))
+        XCTAssertNil(store.items[0].activities[0].finishedAt)
+        XCTAssertEqual(TaskStatistics.summary(2, through: date(22), records: store.records, calendar: calendar).periodCompleted, 0)
+        XCTAssertTrue(store.toggleCompletion(task, on: date(22, hour: 8), calendar: calendar))
+        XCTAssertEqual(store.items[0].activities[0].elapsed, 9 * 3600)
+        XCTAssertEqual(TaskStatistics.summary(2, through: date(22), records: store.records, calendar: calendar).periodCompleted, 1)
+    }
+
+    @MainActor func testGlobalRecordingModePersistsWithoutChangingTaskHistory() throws {
+        let suite = "P2J-tests-\(UUID().uuidString)"
+        let preferences = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let repo = repository()
+        defer {
+            preferences.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent())
+        }
+        let store = TaskStore(repository: repo, preferences: preferences)
+        XCTAssertEqual(store.recordingMode, .normal)
+        let task = item(.daily)
+        XCTAssertTrue(store.add(task))
+        XCTAssertTrue(store.toggleCompletion(task, on: date(21), calendar: calendar))
+        let before = store.records
+        store.setRecordingMode(.detailed)
+        XCTAssertEqual(TaskStore(repository: repo, preferences: preferences).recordingMode, .detailed)
+        XCTAssertEqual(store.records, before)
+        store.setRecordingMode(.normal)
+        XCTAssertEqual(store.records, before)
+        XCTAssertTrue(store.toggleCompletion(task, on: date(22), calendar: calendar))
+    }
+
+    @MainActor func testAutomationCannotBypassDetailedStartRequirement() throws {
+        let repo = repository()
+        defer { try? FileManager.default.removeItem(at: repo.fileURL.deletingLastPathComponent()) }
+        let store = TaskStore(repository: repo)
+        let task = TodoItem(title: "상세 모드", startDate: TaskClock.dayDate())
+        XCTAssertTrue(store.add(task))
+        store.setRecordingMode(.detailed)
+        let finish = TaskAutomationRequest(id: UUID(), operation: "complete", taskID: task.id, completed: true)
+        XCTAssertThrowsError(try TaskAutomation.execute(finish, store: store))
+        _ = try TaskAutomation.execute(TaskAutomationRequest(id: UUID(), operation: "start", taskID: task.id), store: store)
+        _ = try TaskAutomation.execute(finish, store: store)
+        XCTAssertNotNil(store.items[0].activities[0].startedAt)
+        XCTAssertNotNil(store.items[0].activities[0].finishedAt)
+    }
+
 }

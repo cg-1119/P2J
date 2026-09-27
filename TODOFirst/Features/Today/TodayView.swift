@@ -88,6 +88,11 @@ struct TodayView: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .frame(maxWidth: 340)
+                TaskRecordingModePicker()
+                if store.recordingMode == .detailed {
+                    Text("시작 → 종료를 직접 기록해요. 오전 6시가 지나도 종료하지 않으면 미완료예요.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
 
             if let error = store.errorMessage {
@@ -185,14 +190,8 @@ private struct TaskRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            Toggle(isOn: Binding(get: { item.isCompleted(on: date) }, set: { _ in onToggle() })) {
-                Text("\(item.title) 오늘 완료")
-            }
-            .labelsHidden()
-            .toggleStyle(.checkbox)
-            .disabled(!item.occurs(on: date))
-            .help(item.occurs(on: date) ? "오늘 완료 표시 또는 취소" : "오늘 해당하지 않는 일정입니다")
-            .padding(.top, 3)
+            TaskCompletionControl(item: item, date: date)
+                .padding(.top, 3)
             VStack(alignment: .leading, spacing: 5) {
                 Text(item.title).font(.headline).textSelection(.enabled)
                     .strikethrough(item.isCompleted(on: date))
@@ -264,7 +263,22 @@ struct TaskTimingView: View {
             } else if item.isCompleted(on: date) {
                 Text("완료 · 시각 기록 없음")
             } else if activity?.startedAt != nil {
-                Text("진행 중").foregroundStyle(.teal)
+                Text("진행 중 · 종료 미기록").foregroundStyle(.teal)
+            }
+            if store.recordingMode == .detailed && item.occurs(on: date) {
+                if item.isCompleted(on: date) {
+                    Button("완료 취소", systemImage: "arrow.uturn.backward") { store.toggleCompletion(item) }
+                        .buttonStyle(.borderless)
+                } else if activity?.startedAt != nil {
+                    Button("종료", systemImage: "stop.fill") { store.toggleCompletion(item) }
+                        .buttonStyle(.borderedProminent).tint(.teal)
+                        .accessibilityLabel("\(item.title) 종료")
+                }
+                if item.repeatRule != .period,
+                   let unfinished = item.activities.last(where: { $0.day < TaskDay(date) && $0.startedAt != nil && $0.finishedAt == nil }) {
+                    Text("이전 기록 미완료 · \(unfinished.day.date()!.formatted(date: .abbreviated, time: .omitted)) 종료 미기록")
+                        .foregroundStyle(.orange)
+                }
             }
             if activity?.startedAt == nil && !item.isCompleted(on: date) && item.occurs(on: date) {
                 Button { store.start(item) } label: { Label("시작", systemImage: "play.fill") }
@@ -339,4 +353,37 @@ private struct TaskTimeEditor: View {
         }
     }
 
+}
+
+struct TaskRecordingModePicker: View {
+    @Environment(TaskStore.self) private var store
+    var body: some View {
+        HStack(spacing: 10) {
+            Text("기록 모드").font(.caption).foregroundStyle(.secondary)
+            Picker("기록 모드", selection: Binding(get: { store.recordingMode }, set: { store.setRecordingMode($0) })) {
+                ForEach(TaskRecordingMode.allCases) { mode in Text(mode.title).tag(mode) }
+            }
+            .labelsHidden().pickerStyle(.segmented).frame(maxWidth: 260)
+        }
+    }
+}
+
+struct TaskCompletionControl: View {
+    @Environment(TaskStore.self) private var store
+    let item: TodoItem
+    let date: Date
+    var body: some View {
+        if store.recordingMode == .detailed {
+            Image(systemName: item.isCompleted(on: date) ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(item.isCompleted(on: date) ? Color.teal : Color.secondary)
+                .accessibilityLabel(item.isCompleted(on: date) ? "완료" : "미완료")
+        } else {
+            Toggle(isOn: Binding(get: { item.isCompleted(on: date) }, set: { _ in store.toggleCompletion(item) })) {
+                Text("\(item.title) 오늘 완료")
+            }
+            .labelsHidden().toggleStyle(.checkbox)
+            .disabled(!item.occurs(on: date))
+            .help(item.occurs(on: date) ? "오늘 완료 표시 또는 취소" : "오늘 해당하지 않는 일정입니다")
+        }
+    }
 }
