@@ -68,16 +68,18 @@ struct TodayView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                SettingsLink { Image(systemName: "gearshape") }.help("설정 (⌘,)")
-                Button {
-                    editor = .new(UUID())
-                } label: {
-                    Label("할 일 추가", systemImage: "plus")
+                HStack(alignment: .center, spacing: 10) {
+                    SettingsLink { Image(systemName: "gearshape") }.help("설정 (⌘,)")
+                    Button {
+                        editor = .new(UUID())
+                    } label: {
+                        Label("할 일 추가", systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut("n", modifiers: .command)
+                    .disabled(!store.isReady)
                 }
-                .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .keyboardShortcut("n", modifiers: .command)
-                .disabled(!store.isReady)
             }
 
             VStack(alignment: .leading, spacing: 8) {
